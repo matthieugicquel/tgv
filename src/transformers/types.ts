@@ -4,7 +4,13 @@ export type TransformerFactory = (options: TransformerOptions) => Transformer;
 
 export type Transformer = (data: TransformData) => TransformData;
 
-export type TransformData = { code: string; map?: string; filepath: string };
+export type TransformData = {
+  code: string;
+  map?: string;
+  filepath: string;
+  loader: 'tsx' | 'ts' | 'jsx' | 'js';
+  is_app_code: boolean;
+};
 
 export type TransformerOptions = {
   hmr?: boolean;

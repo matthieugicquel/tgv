@@ -8,7 +8,6 @@ const dir = 'hmr-test-app/www';
     const server = await start_dev({
       port: 3000,
       entryPoint: 'hmr-test-app/src/index.tsx',
-      outdir: dir,
     });
 
     server.get('/index.html', (_req, res) => {

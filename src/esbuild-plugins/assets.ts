@@ -1,7 +1,8 @@
 import type * as esbuild from 'esbuild';
 import { readFile } from 'fs/promises';
-import { ImageURISource } from 'react-native';
 import image_size from 'image-size';
+import { normalize_path } from '../path-utils';
+import * as path from 'path';
 
 // TODO: support all image types (and maybe other assets?)
 export const asset_extensions = ['.png'];
@@ -18,37 +19,48 @@ export const assets_plugin = (): esbuild.Plugin => {
       });
 
       build.onLoad({ filter: /.*/, namespace: 'assets' }, async ({ path: filepath }) => {
-        // TODO: a better approach. Including all images in the bundle doesn't scale...
-        // Also need to use @2x, @3x, etc.
+        const relative_path = normalize_path(filepath);
 
         const buffer = await readFile(filepath);
 
         const size = image_size(buffer);
 
-        const asset: ImageURISource = {
-          uri: `data:image/png;base64,${buffer.toString('base64')}`,
+        const parsed = path.parse(relative_path);
+
+        const asset: PackagerAsset = {
+          __packager_asset: true,
+          hash: 'hello', // TODO
+          name: parsed.name,
+          type: parsed.ext.replace('.', ''),
           width: size.width,
           height: size.height,
+          scales: [1], // TODO
+          httpServerLocation: `assets-server/${parsed.dir}`,
         };
 
+        const contents = `
+const { registerAsset } = require('react-native/Libraries/Image/AssetRegistry.js');
+
+module.exports = registerAsset(${JSON.stringify(asset, null, 2)});
+`;
+
         return {
-          contents: JSON.stringify(asset),
-          loader: 'json',
+          contents,
+          loader: 'js',
+          resolveDir: process.cwd(),
         };
       });
     },
   };
 };
 
-// Will probably want to serve assets from the server in dev
-// server.get('/assets', (req, res) => {
-//   console.log('asset', req.query);
-//   if (!req.query.path || typeof req.query.path !== 'string') {
-//     res.writeHead(404);
-//     res.end();
-//     return;
-//   }
-
-//   res.writeHead(200, { 'Content-type': 'image/png' });
-//   createReadStream(req.query.path).pipe(res);
-// });
+type PackagerAsset = {
+  __packager_asset: boolean;
+  httpServerLocation: string;
+  hash: string;
+  width?: number;
+  height?: number;
+  scales: number[];
+  name: string;
+  type: string;
+};

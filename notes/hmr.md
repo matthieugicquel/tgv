@@ -23,15 +23,27 @@ https://blog.nativescript.org/deep-dive-into-hot-module-replacement-with-webpack
 
 Key: We need a module cache, to be able to re-run modules on demand
 
+
+# HMR with esbuild
+
+It seems there were some experiments
+
+https://github.com/evanw/esbuild/issues/645#issuecomment-797143417
+https://github.com/progrium/hotweb/blob/master/pkg/jsexports/jsexports.go
+
+https://github.com/expo/expo-cli/pull/3659
+
 # Module wrapping
 
 ```ts
 // An alternative to the current wrappers injected with a build plugin: overriding the esbuild __commonJS wrapper function
 // Not used right now
-globalThis.$COMMONJS = (callback_obj: { [key: string]: ModuleFn }) => () => {
+globalThis.$REQUIRE = (callback_obj: { [key: string]: ModuleFn }) => () => {
   const identifier = Object.keys(callback_obj)[0];
 
-  if (ModuleResultCache.has(identifier)) return ModuleResultCache.get(identifier)?.exports;
+  if (ModuleResultCache.has(identifier)) {
+    return ModuleResultCache.get(identifier)?.exports;
+  }
 
   const module_fn = callback_obj[identifier];
   const _module = { exports: {} };

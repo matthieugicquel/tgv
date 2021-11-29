@@ -40,12 +40,21 @@ function init_ws() {
 
   ws.addEventListener('message', ({ data }) => {
     console.log('➡️ message received');
-    const parsed = JSON.parse(data) as ServerMessage;
+
+    const [message, payload] = (data as string).split('§', 2) as [
+      message: ServerMessage,
+      payload: string | undefined
+    ];
+
+    if (!payload) {
+      console.warn('Missing payload');
+      return;
+    }
 
     if (globalThis.globalEvalWithSourceUrl) {
-      globalThis.globalEvalWithSourceUrl(parsed.module_string, parsed.sourceURL);
+      globalThis.globalEvalWithSourceUrl(payload, message.sourceURL);
     } else {
-      eval(parsed.module_string);
+      eval(payload);
     }
   });
 }

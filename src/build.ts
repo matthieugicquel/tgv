@@ -1,11 +1,11 @@
 import * as esbuild from 'esbuild';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Transform, Writable } from 'stream';
 import { assets_plugin } from './esbuild-plugins/assets';
 import { hot_module_plugin } from './esbuild-plugins/hot-module';
 import { inject_runtime_plugin } from './esbuild-plugins/inject-runtime';
 import { transform_js_dev_plugin, transform_js_plugin } from './esbuild-plugins/transform-js';
-import { transform_json_dev_plugin } from './esbuild-plugins/transform-json';
 
 type BundleParams = {
   entryPoint: string;
@@ -13,8 +13,8 @@ type BundleParams = {
 };
 
 type BundleResult = {
-  code: Uint8Array;
-  map: Uint8Array;
+  code: string;
+  map: string;
   metafile: esbuild.Metafile;
 };
 
@@ -23,20 +23,19 @@ export async function bundle({ entryPoint, platform }: BundleParams): Promise<Bu
     ...compute_build_options({
       platform,
       define: {
-        // TODO: even with this, esbuild doesn't remove files like ReactNativeRenderer-dev from the prod bundle
-        __DEV__: 'true',
+        __DEV__: 'false',
       },
     }),
     stdin: preprend_polyfills_to_entryPoint(entryPoint),
     plugins: [assets_plugin(), transform_js_plugin()],
     logLevel: 'info',
     logLimit: 10,
-    minify: false,
+    minify: true,
   });
 
   return {
-    code: result.outputFiles[1].contents,
-    map: result.outputFiles[0].contents,
+    code: result.outputFiles[1].text,
+    map: result.outputFiles[0].text,
     metafile: result.metafile as esbuild.Metafile, // We passed the option, we know it's there
   };
 }
@@ -44,11 +43,12 @@ export async function bundle({ entryPoint, platform }: BundleParams): Promise<Bu
 type BundleForHMRParams = BundleParams & {
   client_id: string;
   port: number;
+  code_stream: Writable;
 };
 
-type BundleForHMRResult = BundleResult & {
+type BundleForHMRResult = {
   included_modules: Set<string>;
-  build_for_hmr: (entryPoint: string) => Promise<{ code: string; map: string }>;
+  build_for_hmr: (changed_files: string[]) => Promise<{ code: string; map: string }>;
 };
 
 /**
@@ -67,6 +67,7 @@ export async function bundle_for_hmr({
   entryPoint,
   client_id,
   port,
+  code_stream,
 }: BundleForHMRParams): Promise<BundleForHMRResult> {
   const build_options = compute_build_options({
     platform,
@@ -84,40 +85,45 @@ export async function bundle_for_hmr({
       entryPoints: [path.join(__dirname, 'runtimes/before-modules.ts')],
       nodePaths: [path.join(process.cwd(), 'node_modules')], // To resolve react-refresh to the locally installed package
     })
-  ).outputFiles[1].text;
+  ).outputFiles[1].contents;
+
+  code_stream.write(banner);
 
   const result = await esbuild.build({
     ...build_options,
     stdin: preprend_polyfills_to_entryPoint(entryPoint),
-    banner: { js: banner },
-    footer: { js: 'globalThis.$IS_INITIALIZED = true' },
-    plugins: [
-      assets_plugin(),
-      inject_runtime_plugin(),
-      transform_js_dev_plugin(),
-      transform_json_dev_plugin(),
-    ],
+    plugins: [assets_plugin(), inject_runtime_plugin(), transform_js_dev_plugin()],
+    // Going through fs is faster than going through esbuild's stdio protocol
+    // TODO: This will 💣 if multiple clients are connected at the same time
+    write: true,
   });
 
   // Keep track of which deps have been sent to this client
   // TODO: is using the metafile for that reliable?
   const client_cached_modules = new Set(Object.keys(result.metafile?.inputs ?? {}));
 
+  const esbuild_code_stream = fs.createReadStream('.tgv-cache/stdin.js', 'utf8');
+  esbuild_code_stream.pipe(create_cjs_override_transform()).pipe(code_stream);
+
+  // Create the plugins here to not recreate them every time there's a hot reload
+  const hot_plugins: esbuild.Plugin[] = [assets_plugin(), hot_module_plugin(client_cached_modules)];
+
   return {
-    code: result.outputFiles[1].contents,
-    map: result.outputFiles[0].contents,
-    metafile: result.metafile as esbuild.Metafile, // We passed the option, we know it's there
     included_modules: client_cached_modules,
-    async build_for_hmr(entryPoint: string) {
+    async build_for_hmr(changed_files: string[]) {
+      for (const file of changed_files) client_cached_modules.delete(file);
+
+      const entry_point_contents = changed_files.map(file => `import '${file}';`).join('\n');
+
       try {
         const result = await esbuild.build({
           ...build_options,
-          entryPoints: [entryPoint],
-          plugins: [
-            assets_plugin(),
-            transform_json_dev_plugin(),
-            hot_module_plugin(client_cached_modules),
-          ],
+          stdin: {
+            contents: entry_point_contents,
+            resolveDir: process.cwd(),
+            sourcefile: 'latest-hmr.js',
+          },
+          plugins: hot_plugins,
         });
 
         for (const dep of Object.keys(result.metafile?.inputs ?? {})) {
@@ -125,7 +131,7 @@ export async function bundle_for_hmr({
         }
 
         return {
-          code: result.outputFiles[1].text,
+          code: override_cjs_helper_hmr(result.outputFiles[1].text, changed_files),
           map: result.outputFiles[0].text,
         };
       } catch (error) {
@@ -201,6 +207,7 @@ const get_polyfills = () => {
 import 'react-native/Libraries/polyfills/console';
 import 'react-native/Libraries/polyfills/error-guard';
 import 'react-native/Libraries/polyfills/Object.es7';
+import 'react-native/Libraries/Core/InitializeCore';
 `;
   }
 
@@ -208,5 +215,44 @@ import 'react-native/Libraries/polyfills/Object.es7';
 import '@react-native/polyfills/console';
 import '@react-native/polyfills/error-guard';
 import '@react-native/polyfills/Object.es8';
+// When adding reanimated, without this I get "can't find variable: setImmediate"
+// May be solved by https://github.com/software-mansion/react-native-reanimated/issues/2621
+import 'react-native/Libraries/Core/InitializeCore';
 `;
 };
+
+function create_cjs_override_transform() {
+  let is_done = false;
+  return new Transform({
+    transform(chunk, _encoding, callback) {
+      if (is_done) {
+        callback(null, chunk);
+        return;
+      }
+      const string_content = chunk.toString();
+      if (!esbuild_helper_regExp.test(string_content)) {
+        callback(null, chunk);
+        return;
+      }
+      // It's a match!
+      is_done = true;
+      callback(null, override_cjs_helper_bundle(string_content));
+    },
+  });
+}
+
+function override_cjs_helper_bundle(bundle_with_runtime: string) {
+  return bundle_with_runtime.replace(
+    esbuild_helper_regExp,
+    'var __commonJS = globalThis.$COMMONJS;'
+  );
+}
+
+function override_cjs_helper_hmr(hmr_bundle: string, changed_modules: string[]) {
+  return hmr_bundle.replace(
+    esbuild_helper_regExp,
+    `var __commonJS = globalThis.$COMMONJS_HOT(${JSON.stringify(changed_modules)});`
+  );
+}
+
+const esbuild_helper_regExp = /var __commonJS.*\n.*\n\s*};/;

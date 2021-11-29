@@ -1,6 +1,6 @@
 # TGV - an EXPERIMENTAL faster bundler and dev server for React Native
 
-# ⚠️ This will probably not work with your app, and is very incomplete
+## ⚠️ This will probably not work with your app, and is very incomplete
 
 Known limitations:
 
@@ -8,6 +8,13 @@ Known limitations:
 - May work with latest hermes (0.9 - with RN 0.66), won't work with previous hermes versions
 - Production bundles are not optimized, they will be bigger than with metro
 - Node >= 16 is required
+
+# Goals
+
+- A dev server that runs all day long without getting in your way. It should handle things like branch switches, `yarn install` smoothly and you should never wait for it
+- Fast bundling (a few seconds) so that OTA deploys (codepush, expo...) are fast
+- Smaller and faster prod bundles thanks to tree-shaking, ES modules scope-hoisting...
+- When this is done, build on top of it to push the React Native DX further
 
 # Installation
 
@@ -42,8 +49,10 @@ yarn
 
 # Usage
 
+## Dev server
 ```sh
-yarn tgv # This starts a dev server that replaces metro
+yarn react-native start-tgv # This starts a dev server that replaces metro, should be done before `run-x`
+# TODO: find a way to automatically replace metro
 yarn react-native run-(ios|android)
 ```
 
