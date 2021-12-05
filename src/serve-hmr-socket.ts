@@ -1,62 +1,50 @@
 import { logger } from '@react-native-community/cli-tools';
-import { Server } from 'http';
 import WebSocket from 'ws';
-import { ClientMessage, ServerMessage } from './ws.types';
+import { ServerMessage } from './ws.types';
 
-export function serve_hmr_socket(server: Server) {
-  const wss = new WebSocket.Server({ server });
+type Params = {
+  port: number;
+  client_id: string;
+  attach: (path: string, wss: WebSocket.Server) => void;
+  on_close: () => void;
+};
+export function create_hmr_wss({ port, client_id, attach, on_close }: Params) {
+  const wss = new WebSocket.Server({ noServer: true });
 
-  const clients = new Map<string, WebSocket>();
-  const callbacks = new Map<string, () => void>();
+  attach(`/hmr/${client_id}`, wss);
 
   wss.on('connection', ws => {
-    ws.once('message', data => {
-      const message: ClientMessage = JSON.parse(data.toString());
+    logger.debug(`🔁 WS connected (client_id: ${client_id})`);
 
-      if (message.type === 'register') {
-        logger.debug(`🔁 WS connected (id: ${message.client_id})`);
-        console.timeEnd(`bundle round trip - ${message.client_id}`);
-
-        clients.set(message.client_id, ws);
-
-        ws.once('close', () => {
-          callbacks.get(message.client_id)?.();
-          logger.debug(`❌ WS disconnected (id: ${message.client_id})`);
-        });
-        return;
-      }
+    ws.once('close', () => {
+      logger.debug(`❌ WS disconnected (client_id: ${client_id})`);
+      on_close?.();
+      wss.close();
     });
   });
 
-  const broadcast = (data: ServerMessage) => {
+  const broadcast = (data: string) => {
     for (const client of wss.clients) {
       if (client.readyState !== WebSocket.OPEN) return;
-      client.send(JSON.stringify(data));
+      client.send(data);
     }
   };
 
   return {
-    broadcast,
-    client(client_id: string, on_close: () => void) {
-      callbacks.set(client_id, on_close);
-      return {
-        send_update(module_string: string) {
-          const client = clients.get(client_id);
-          // TODO: queue updates while client is not connected?
-          if (!client) {
-            logger.debug(`Missing client ${client_id}`);
-            return;
-          }
-
-          const json_payload: ServerMessage = {
-            type: 'update',
-            sourceURL: 'latest-hmr.js', // TODO
-          };
-
-          // Avoid JSON.stringify on the bundle content, it can be huge
-          client.send(`${JSON.stringify(json_payload)}§${module_string}`);
-        },
+    socket_url: construct_socket_url(port, client_id),
+    send_update(modules_to_hot_replace: string[], code_payload: string) {
+      const json_payload: ServerMessage = {
+        type: 'update',
+        modules_to_hot_replace,
+        sourceURL: '<hmr-payload>', // TODO
       };
+
+      // Avoid JSON.stringify on the bundle content, it can be huge
+      broadcast(`${JSON.stringify(json_payload)}§${code_payload}`);
     },
   };
+}
+
+function construct_socket_url(port: number, client_id: string) {
+  return `ws://localhost:${port}/hmr/${client_id}`;
 }

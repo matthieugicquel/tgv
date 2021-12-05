@@ -1,3 +1,5 @@
+import { performance } from 'perf_hooks';
+
 export const pipe = <T>(...fns: ((input: T) => T)[]) => {
   return function run_pipe(input: T): T {
     let result = input;
@@ -24,4 +26,9 @@ export const lazy = <T>(fn: () => T) => {
     if (result === undefined) result = fn();
     return result;
   };
+};
+
+export const time = async <T>(promise: Promise<T>): Promise<[result: T, duration: number]> => {
+  const start = performance.now();
+  return [await promise, Math.round(performance.now() - start)];
 };

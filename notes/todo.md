@@ -10,8 +10,8 @@
 
 ### Error handling
 
-- [ ] Have a strategy for readable compile errors
-- [ ] Make sure babel errors look nice
+- [x] Have a strategy for readable compile errors
+- [x] Make sure babel errors look nice
 - [ ] Detect when `yarn install` should be run
 
 # Dev server
@@ -42,7 +42,7 @@
 - [x] Send module updates
 - [ ] Send full refresh instruction
 - [ ] Show console.log in CLI output?
-- [ ] Auto-reconnect on start?
+- [x] Auto-reconnect on start
 
 ## Perf
 

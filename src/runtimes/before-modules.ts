@@ -19,57 +19,16 @@ const ModuleRunCache = new Map<string, ModuleFn>();
 const ModuleResultCache = new Map<string, { exports: any }>();
 
 // And in case the hot-replaced module is not a refresh boundary, we need to walk up the parents tree
-const ModuleImportersCache = new Map<string, Set<string>>();
+const ModuleGraph = create_module_graph();
 
 globalThis.$COMMONJS = (callback_obj: { [key: string]: ModuleFn }) => {
   const identifier = Object.keys(callback_obj)[0];
   const module_fn = callback_obj[identifier];
 
   ModuleRunCache.set(identifier, module_fn);
-  ModuleImportersCache.set(identifier, new Set());
 
   return function __require() {
-    const { finalize_dep_graph_registration } = prepare_dep_graph_registration(identifier);
-    try {
-      return require_inner(identifier);
-    } finally {
-      finalize_dep_graph_registration();
-    }
-  };
-};
-
-globalThis.$COMMONJS_HOT = (changed_modules: string[]) => {
-  return function __commonJS_hot(callback_obj: { [key: string]: ModuleFn }) {
-    const identifier = Object.keys(callback_obj)[0];
-
-    if (!changed_modules.includes(identifier)) {
-      // This is either a cached module or a module that was bundled with the one we want to hot-replace
-      return globalThis.$COMMONJS(callback_obj);
-    }
-
-    // This is the module we want to hot-replace
-    const module_fn = callback_obj[identifier];
-
-    // Hot reload the module
-    // Make sure we do that in the registration fn, not the require call, so that everything is clean when code starts executing, even if there are deps between the changed modules
-    ModuleRunCache.set(identifier, module_fn);
-    ModuleResultCache.delete(identifier);
-    parent_module_id = undefined;
-
-    let has_tried_refreshing = false;
-
-    return function __require_hot() {
-      try {
-        const _exports = require_inner(identifier);
-        if (!has_tried_refreshing) {
-          has_tried_refreshing = true;
-          maybe_perform_refresh(identifier);
-        }
-        return _exports;
-      } catch (error) {
-        console.error(`Hot module ${identifier} errored`, error);
-      }
-    };
+    return require_inner(identifier);
   };
 };
 
@@ -100,25 +59,52 @@ function require_inner(identifier: string) {
     module_fn(_module.exports, _module);
     conclude_refresh_registration(_module);
     return _module.exports;
-  } catch (error) {
-    throw error;
   } finally {
     reset_refresh_registration();
   }
 }
 
-let parent_module_id: string | undefined = 'entry-point';
+globalThis.$UPDATE_MODULE_GRAPH = graph => {
+  for (const key in graph) ModuleResultCache.delete(key);
+  ModuleGraph.update(graph);
+};
 
-function prepare_dep_graph_registration(identifier: string) {
-  const prev_parent_module_id = parent_module_id;
-  parent_module_id = identifier;
+export type ModuleGraphT = {
+  update: (graph: { [identifier: string]: string[] }) => void;
+  get_imports: (identifier: string) => ReadonlySet<string>;
+  get_importers: (identifier: string) => ReadonlySet<string>;
+};
+function create_module_graph(): ModuleGraphT {
+  const Graph = new Map<string, ReadonlySet<string>>();
+
+  let InvertedGraph: Map<string, Set<string>> | undefined;
+
+  function invert() {
+    InvertedGraph = new Map();
+
+    for (const [importer, imports] of Graph.entries()) {
+      for (const import_path of imports) {
+        if (!InvertedGraph.has(import_path)) {
+          InvertedGraph.set(import_path, new Set());
+        }
+        InvertedGraph.get(import_path)?.add(importer);
+      }
+    }
+    return InvertedGraph;
+  }
 
   return {
-    finalize_dep_graph_registration() {
-      if (identifier !== prev_parent_module_id && prev_parent_module_id) {
-        ModuleImportersCache.get(identifier)?.add(prev_parent_module_id);
+    update(graph) {
+      for (const [identifier, imports] of Object.entries(graph)) {
+        Graph.set(identifier, new Set(imports));
       }
-      parent_module_id = prev_parent_module_id;
+      invert();
+    },
+    get_imports(identifier) {
+      return Graph.get(identifier) ?? new Set<string>();
+    },
+    get_importers(identifier) {
+      return InvertedGraph?.get(identifier) ?? new Set<string>();
     },
   };
 }
@@ -160,7 +146,7 @@ function prepare_refresh_registration(identifier: string) {
   };
 }
 
-function maybe_perform_refresh(hmr_identifier: string) {
+globalThis.$PERFORM_REFRESH = (modules_to_replace: string[]) => {
   const boundaries = new Set<string>();
   const modules_to_rerun = new Set<string>();
 
@@ -171,16 +157,19 @@ function maybe_perform_refresh(hmr_identifier: string) {
 
     if (is_refresh_boundary(_exports)) {
       boundaries.add(identifier);
+      console.log(`${identifier} is a refresh boundary`);
       return true;
     }
 
-    const importers = ModuleImportersCache.get(identifier);
+    const importers = ModuleGraph.get_importers(identifier);
+    console.log(`${identifier} is not a refresh boundary, importers:`, [...(importers || [])]);
+
     if (!importers?.size) return false; // We've reached the entry-point (or there's a bug)
 
     return [...importers].every(importer => find_refresh_boundaries(importer));
   }
 
-  const can_refresh = find_refresh_boundaries(hmr_identifier);
+  const can_refresh = modules_to_replace.every(identifier => find_refresh_boundaries(identifier));
 
   if (!can_refresh) {
     console.warn('Full refresh needed');
@@ -195,12 +184,11 @@ function maybe_perform_refresh(hmr_identifier: string) {
   }
 
   for (const boundary of boundaries) {
-    parent_module_id = undefined;
     require_inner(boundary);
   }
 
   Refresh.performReactRefresh();
-}
+};
 
 /*
  * Utilities

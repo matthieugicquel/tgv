@@ -4,10 +4,9 @@ import { StaticPool } from 'node-worker-threads-pool';
 import { cpus } from 'os';
 import { compute_hash, create_cache } from '../cache';
 import { normalize_path } from '../path-utils';
-import { create_sucrase_transformer } from '../transformers/sucrase';
+import { determine_transforms } from '../transformers/determine-transforms';
+import { sucrase_transformer } from '../transformers/sucrase';
 import { TransformData, TransformerOptions } from '../transformers/types';
-
-const TransformCache = create_cache();
 
 export const transform_js_plugin = (): esbuild.Plugin => {
   return {
@@ -34,25 +33,11 @@ export const transform_js_dev_plugin = (): esbuild.Plugin => {
 };
 
 export const create_js_multitransformer = (options: TransformerOptions) => {
-  const babel_pool = new StaticPool({
-    // esbuild uses lots of cpus, using 1/3 seems to be the best for perf
-    size: Math.round(cpus().length / 3),
-    task: require.resolve('../transformers/babel-worker'),
-    workerData: options,
-  });
-  const babel = babel_pool.exec;
-
-  const sucrase = create_sucrase_transformer(options);
-
-  type Params = {
-    path: string;
-  };
+  type Params = { path: string };
   return async function js_multitransformer(
     params: Params
   ): Promise<esbuild.OnLoadResult | undefined> {
     const relative_path = normalize_path(params.path);
-
-    const code = await readFile(relative_path, 'utf8');
 
     const loader = (function determine_loader() {
       if (relative_path.endsWith('.ts')) return 'ts';
@@ -62,24 +47,34 @@ export const create_js_multitransformer = (options: TransformerOptions) => {
       return 'js';
     })();
 
+    const code = await readFile(relative_path, 'utf8');
+
     const hash = compute_hash(code);
     const cached = TransformCache.get(relative_path, hash);
     if (cached) return { contents: cached, loader };
 
-    const input: TransformData = {
-      code,
-      filepath: relative_path,
-      loader,
-      is_app_code: !relative_path.includes('node_modules/'),
-    };
-
     try {
-      // ⚠️ The babel reanimated plugin must run before the sucrase imports transform, otherwise it doesn't detect imports
-      const babel_result = await babel(input);
-      const result = sucrase(babel_result);
+      let data: TransformData = {
+        code,
+        filepath: relative_path,
+        loader,
+        required_transforms: [],
+      };
 
-      TransformCache.set(relative_path, hash, result.code);
-      return { contents: result.code, loader };
+      data.required_transforms = determine_transforms(options, data);
+
+      // ⚠️ The babel reanimated plugin must run before the sucrase imports transform, otherwise it doesn't detect imports
+      if (
+        data.required_transforms.includes('reanimated2') ||
+        data.required_transforms.includes('react-refresh') ||
+        data.required_transforms.includes('classes-for-hermes')
+      ) {
+        data = await babel(data);
+      }
+      data = sucrase_transformer(data);
+
+      TransformCache.set(relative_path, hash, data.code);
+      return { contents: data.code, loader };
     } catch (error) {
       // This is probably an internal, uncontrolled error
       if (!is_transform_error(error)) throw error;
@@ -88,6 +83,19 @@ export const create_js_multitransformer = (options: TransformerOptions) => {
     }
   };
 };
+
+const TransformCache = create_cache('transform-cache');
+
+const babel_pool = new StaticPool({
+  // esbuild already uses lots of cpus, using 1/3 seems to be the best for perf
+  size: Math.round(cpus().length / 3),
+  task: require.resolve('../transformers/babel-worker'),
+});
+const babel: (input: TransformData) => Promise<TransformData> = babel_pool.exec;
+
+export async function destroy_worker_pool() {
+  await babel_pool.destroy();
+}
 
 const is_transform_error = (error: unknown): error is esbuild.PartialMessage => {
   return 'location' in (error as esbuild.PartialMessage);

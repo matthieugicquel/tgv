@@ -1,12 +1,12 @@
-import { writeFile } from 'fs/promises';
-import { bundle, bundle_for_hmr } from './build';
-import { spin } from './reporter';
-import { serve_hmr_socket } from './serve-hmr-socket';
-import { create_server } from './serve-http';
+import { bundle, create_dev_bundler, DevBundler, DevBundlerParams } from './build';
+import { print_errors, spin } from './reporter';
+import { create_http_server } from './serve-http';
 import { watch } from './watch';
 import crypto from 'crypto';
 import * as fs from 'fs';
 import { logger } from '@react-native-community/cli-tools';
+import { create_hmr_wss } from './serve-hmr-socket';
+import { time } from './utils';
 
 const MODE: 'HMR' | 'BUNDLE' | 'SERVE-CACHE' = 'HMR';
 
@@ -20,90 +20,60 @@ export async function start_dev({ port, entryPoint }: Params) {
 
   if (!fs.existsSync('.tgv-cache')) fs.mkdirSync('.tgv-cache');
 
-  const { server, ws_server: hmr_server } = create_server({
-    port,
-    create_ws_server: serve_hmr_socket,
-  });
+  const { server, attach_wss } = create_http_server(port);
 
   server.get('/index.bundle', async function bundle_request(req, res) {
     try {
-      if (typeof req.query.platform !== 'string') throw 'Invalid query';
-      if (!['ios', 'android'].includes(req.query.platform)) throw 'Unsupported platform';
+      const platform = req.query.platform;
+      if (typeof platform !== 'string') throw 'Invalid query';
+      assert_supported_platform(platform);
 
       if (MODE === 'HMR') {
         const client_id = generate_client_id();
 
-        console.time(`bundle round trip - ${client_id}`);
-
         res.writeHead(200, { 'Content-Type': 'application/javascript' });
-
-        const { build_for_hmr, included_modules } = await spin(
-          `🚀 Bundling ${entryPoint} for ${req.query.platform}`,
-          bundle_for_hmr({
-            entryPoint,
-            client_id,
-            port,
-            platform: req.query.platform as 'ios' | 'android',
-            code_stream: res,
-          })
-        );
 
         let watcher: ReturnType<typeof watch> | undefined;
 
-        const hmr = hmr_server.client(client_id, async () => {
-          (await watcher)?.unsubscribe();
+        const hmr = create_hmr_wss({
+          client_id,
+          port,
+          attach: attach_wss,
+          async on_close() {
+            (await watcher)?.unsubscribe();
+          },
         });
 
-        watcher = watch(process.cwd(), async changed_files => {
-          const relevant_files = changed_files.filter(file => included_modules.has(file));
-          if (relevant_files.length === 0) {
-            // It doesn't make sense to hot replace a module that isn't included in the bundle
-            // If it's a new file that gets included later, it will be included when it's imported by an already included module
-            return;
-          }
+        const { build_full_bundle, build_hmr_payload } = get_bundler({ platform, entryPoint })(
+          hmr.socket_url
+        );
 
+        await spin(`🚀 Bundling ${entryPoint} for ${platform}`, build_full_bundle(res));
+
+        watcher = watch(process.cwd(), async changed_files => {
           try {
-            const { code } = await build_for_hmr(relevant_files);
-            hmr.send_update(code);
-            logger.log(
-              `HMR - Sending ${relevant_files.length} updated files, incl ${relevant_files[0]}`
+            const [result, duration] = await time(build_hmr_payload(changed_files));
+            if (!result) return;
+            hmr.send_update(result.modules_to_hot_replace, result.code);
+            logger.debug(
+              `♻️  Hot reloaded ${result.modules_to_hot_replace.length} files in ${duration}ms`
             );
-            await writeFile(`.tgv-cache/latest-hmr.js`, code);
           } catch (error) {
-            console.log(error);
+            print_errors(error);
           }
         });
       } else if (MODE === 'BUNDLE') {
-        const { code, map, metafile } = await spin(
-          `🚀 Bundling ${entryPoint} for ${req.query.platform}`,
-          bundle({
-            entryPoint,
-            platform: req.query.platform as 'ios' | 'android',
-          })
-        );
-
-        await writeFile(`.tgv-cache/${entryPoint}`, code); // For debug purposes
-        res.writeHead(200, { 'Content-Type': 'application/javascript' });
-        res.end(code);
-
-        // TODO: put this behind a flag. It's mostly useful for debugging
-        await Promise.allSettled([
-          writeFile(`.tgv-cache/${entryPoint}`, code),
-          writeFile(`.tgv-cache/${entryPoint}.map`, map),
-          writeFile(`.tgv-cache/${entryPoint}.meta.json`, JSON.stringify(metafile, null, 2)),
-        ]);
+        await spin(`🚀 Bundling ${entryPoint} for ${platform}`, bundle({ entryPoint, platform }));
       } /* MODE === 'SERVE-CACHE' */ else {
         res.writeHead(200, { 'Content-Type': 'application/javascript' });
         fs.createReadStream(`.tgv-cache/${entryPoint}`).pipe(res);
       }
     } catch (error) {
-      res.writeHead(500);
-      res.end();
-      console.error(error);
+      print_errors(error);
     }
   });
 
-  server.listen(port);
+  server.listen(port, 'localhost');
 
   // TODO: make sure we cleanup the server even on forced exit
 
@@ -112,4 +82,21 @@ export async function start_dev({ port, entryPoint }: Params) {
 
 function generate_client_id() {
   return crypto.randomBytes(8).toString('hex');
+}
+
+const bundlers = new Map<string, DevBundler>();
+
+function get_bundler(options: DevBundlerParams) {
+  const key = JSON.stringify(options, Object.keys(options).sort());
+  if (!bundlers.has(key)) {
+    // TODO: maybe we should free the resources at some point?
+    bundlers.set(key, create_dev_bundler(options));
+  }
+  return bundlers.get(key) as DevBundler;
+}
+
+function assert_supported_platform(platform: string): asserts platform is 'ios' | 'android' {
+  if (platform !== 'ios' && platform !== 'android') {
+    throw new Error(`Unsupported platform: ${platform}`);
+  }
 }

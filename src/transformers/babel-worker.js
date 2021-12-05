@@ -2,10 +2,10 @@ require('esbuild-register');
 
 // Babel gets a worker thread because it's the slowest part of the build.
 
-const { parentPort, workerData: options } = require('worker_threads');
+const { parentPort } = require('worker_threads');
 
-const babel = require('./babel').create_babel_transformer(options);
+const { babel_transformer } = require('./babel');
 
 parentPort.on('message', input => {
-  parentPort.postMessage(babel(input));
+  parentPort.postMessage(babel_transformer(input));
 });

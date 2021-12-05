@@ -1,143 +1,160 @@
 import * as esbuild from 'esbuild';
 import * as fs from 'fs';
+import without from 'lodash-es/without';
+import keys from 'lodash-es/keys';
 import * as path from 'path';
 import { Transform, Writable } from 'stream';
 import { assets_plugin } from './esbuild-plugins/assets';
+import { entry_point_plugin } from './esbuild-plugins/entry-point';
 import { hot_module_plugin } from './esbuild-plugins/hot-module';
 import { inject_runtime_plugin } from './esbuild-plugins/inject-runtime';
 import { transform_js_dev_plugin, transform_js_plugin } from './esbuild-plugins/transform-js';
 
-type BundleParams = {
+export type DevBundlerParams = {
   entryPoint: string;
   platform: 'ios' | 'android';
 };
 
-type BundleResult = {
-  code: string;
-  map: string;
-  metafile: esbuild.Metafile;
-};
-
-export async function bundle({ entryPoint, platform }: BundleParams): Promise<BundleResult> {
-  const result = await esbuild.build({
+export async function bundle({ entryPoint, platform }: DevBundlerParams): Promise<void> {
+  await esbuild.build({
     ...compute_build_options({
       platform,
       define: {
         __DEV__: 'false',
       },
     }),
-    stdin: preprend_polyfills_to_entryPoint(entryPoint),
-    plugins: [assets_plugin(), transform_js_plugin()],
+    write: true,
+    entryPoints: [entryPoint],
+    plugins: [entry_point_plugin(entryPoint), assets_plugin(), transform_js_plugin()],
     logLevel: 'info',
     logLimit: 10,
     minify: true,
   });
-
-  return {
-    code: result.outputFiles[1].text,
-    map: result.outputFiles[0].text,
-    metafile: result.metafile as esbuild.Metafile, // We passed the option, we know it's there
-  };
 }
 
-type BundleForHMRParams = BundleParams & {
-  client_id: string;
-  port: number;
-  code_stream: Writable;
-};
+export type DevBundler = ReturnType<typeof create_dev_bundler>;
 
-type BundleForHMRResult = {
-  included_modules: Set<string>;
-  build_for_hmr: (changed_files: string[]) => Promise<{ code: string; map: string }>;
-};
+export function create_dev_bundler({ entryPoint, platform }: DevBundlerParams) {
+  const base_build_options = {
+    ...compute_build_options({
+      platform,
+      define: {
+        __DEV__: 'true',
+      },
+    }),
+    treeShaking: false, // It could mess with HMR
+  };
 
-/**
- * The resulting bundle contains these items in this order:
- * - Some basic polyfills
- *   - console is used by the HMR require wrappers
- *   - error-guard I'm not sure if it's needed
- *   - Object.es7 is used by the esbuild bundle helpers (I think)
- * - The HMR require wrappers (`before-modules.ts`)
- * - The app bundle
- *   - Injected inside, where `setUpReactRefresh` would be, our own runtime code (`after-setup.ts`, see `inject_runtime_plugin`)
- * - A footer that tells us initialization is done
- */
-export async function bundle_for_hmr({
-  platform,
-  entryPoint,
-  client_id,
-  port,
-  code_stream,
-}: BundleForHMRParams): Promise<BundleForHMRResult> {
-  const build_options = compute_build_options({
-    platform,
-    define: {
-      $TGV_PORT: port.toString(),
-      $TGV_CLIENT_ID: `'${client_id}'`,
-      __DEV__: 'true',
-    },
+  const banner_promise = esbuild.build({
+    ...base_build_options,
+    entryPoints: [path.join(__dirname, 'runtimes/before-modules.ts')],
+    nodePaths: [path.join(process.cwd(), 'node_modules')], // To resolve react-refresh to the locally installed package
   });
 
-  // This must be defined in the banner, before any bundle code (which uses the wrappers) is executed
-  const banner = (
-    await esbuild.build({
-      ...build_options,
-      entryPoints: [path.join(__dirname, 'runtimes/before-modules.ts')],
-      nodePaths: [path.join(process.cwd(), 'node_modules')], // To resolve react-refresh to the locally installed package
-    })
-  ).outputFiles[1].contents;
-
-  code_stream.write(banner);
-
-  const result = await esbuild.build({
-    ...build_options,
-    stdin: preprend_polyfills_to_entryPoint(entryPoint),
-    plugins: [assets_plugin(), inject_runtime_plugin(), transform_js_dev_plugin()],
+  const full_options = {
+    ...base_build_options,
+    entryPoints: [entryPoint],
     // Going through fs is faster than going through esbuild's stdio protocol
     // TODO: This will 💣 if multiple clients are connected at the same time
     write: true,
-  });
+    incremental: true,
+    plugins: [
+      entry_point_plugin(entryPoint),
+      assets_plugin(),
+      inject_runtime_plugin(),
+      transform_js_dev_plugin(),
+    ],
+  };
 
-  // Keep track of which deps have been sent to this client
-  // TODO: is using the metafile for that reliable?
-  const client_cached_modules = new Set(Object.keys(result.metafile?.inputs ?? {}));
+  let rebuild: esbuild.BuildInvalidate;
 
-  const esbuild_code_stream = fs.createReadStream('.tgv-cache/stdin.js', 'utf8');
-  esbuild_code_stream.pipe(create_cjs_override_transform()).pipe(code_stream);
+  return function bundler_for_client(socket_url: string) {
+    const ClientKnownModules = new Set<string>();
 
-  // Create the plugins here to not recreate them every time there's a hot reload
-  const hot_plugins: esbuild.Plugin[] = [assets_plugin(), hot_module_plugin(client_cached_modules)];
+    const hmr_plugins: esbuild.Plugin[] = [assets_plugin(), hot_module_plugin(ClientKnownModules)];
 
-  return {
-    included_modules: client_cached_modules,
-    async build_for_hmr(changed_files: string[]) {
-      for (const file of changed_files) client_cached_modules.delete(file);
+    return {
+      async build_full_bundle(code_stream: Writable) {
+        try {
+          ClientKnownModules.clear();
 
-      const entry_point_contents = changed_files.map(file => `import '${file}';`).join('\n');
+          const result = rebuild ? await rebuild() : await esbuild.build(full_options);
 
-      try {
-        const result = await esbuild.build({
-          ...build_options,
-          stdin: {
-            contents: entry_point_contents,
-            resolveDir: process.cwd(),
-            sourcefile: 'latest-hmr.js',
-          },
-          plugins: hot_plugins,
-        });
+          rebuild = result.rebuild as esbuild.BuildInvalidate;
 
-        for (const dep of Object.keys(result.metafile?.inputs ?? {})) {
-          client_cached_modules.add(dep);
+          code_stream.write(`globalThis.$TGV_SOCKET_URL = '${socket_url}';\n`);
+          code_stream.write((await banner_promise).outputFiles[1].contents);
+          code_stream.write(compute_dep_graph_string(result.metafile));
+          fs.createReadStream(`.tgv-cache/${entryPoint}`, 'utf8')
+            .pipe(create_cjs_override_transform())
+            .pipe(code_stream);
+
+          const included_modules = Object.keys(result.metafile?.inputs ?? {});
+          for (const identifier of included_modules) ClientKnownModules.add(identifier);
+        } catch (error) {
+          ClientKnownModules.clear();
+          code_stream.end(`throw new Error('\\n\\n🤷 Build failed, check your terminal');`);
+          throw (error as esbuild.BuildFailure).errors;
         }
+      },
+      /**
+       * The payload includes:
+       * - Changed modules that are already included in the bundle
+       * - Modules that are newly imported by the changed modules (recursively)
+       *
+       * @param changed_files A list of relative filepaths that have changed since the last build, which may or may not be part of the bundle
+       */
+      async build_hmr_payload(changed_files: string[]) {
+        // It doesn't make sense to hot replace a module that isn't currently included in the bundle
+        const modules_to_hot_replace = changed_files.filter(file => ClientKnownModules.has(file));
 
-        return {
-          code: override_cjs_helper_hmr(result.outputFiles[1].text, changed_files),
-          map: result.outputFiles[0].text,
-        };
-      } catch (error) {
-        throw (error as esbuild.BuildFailure).errors;
-      }
-    },
+        // Using the whole list of `changed_files` to do the invalidation, not only the modules to hot replace
+        // a module that's not included anymore may get included later
+        for (const identifier of changed_files) ClientKnownModules.delete(identifier);
+
+        if (!modules_to_hot_replace.length) return undefined;
+
+        const entry_point_contents = modules_to_hot_replace
+          .map(filepath => `import './${filepath}';`)
+          .join('\n');
+
+        try {
+          const result = await esbuild.build({
+            ...base_build_options,
+            stdin: {
+              contents: entry_point_contents,
+              resolveDir: process.cwd(),
+              sourcefile: '<hmr-payload>',
+            },
+            plugins: hmr_plugins,
+          });
+
+          const included_modules = without(keys(result.metafile?.inputs), '<hmr-payload>');
+
+          // This will be the modules to replace + the newly included modules if any
+          const modules_in_payload = new Set<string>();
+
+          for (const identifier of included_modules) {
+            if (ClientKnownModules.has(identifier)) continue;
+            modules_in_payload.add(identifier);
+            ClientKnownModules.add(identifier);
+          }
+
+          const code_payload = `
+${compute_dep_graph_string(result.metafile, [...modules_in_payload])}
+${override_cjs_helper(result.outputFiles[1].text)}`;
+
+          return {
+            modules_to_hot_replace,
+            code: code_payload,
+            map: result.outputFiles[0].text, // TODO: offset by dep graph string
+          };
+        } catch (error) {
+          for (const identifier of changed_files) ClientKnownModules.add(identifier); // reset
+          throw (error as esbuild.BuildFailure).errors;
+        }
+      },
+    };
   };
 }
 
@@ -186,41 +203,6 @@ const compute_build_options = ({
   };
 };
 
-function preprend_polyfills_to_entryPoint(entryPoint: string) {
-  // For some reason we need to include these react-native polyfills before the index for things to work
-  const entryPoint_with_polyfills = `
-${get_polyfills()}
-import './${entryPoint}';
-`;
-
-  return {
-    contents: entryPoint_with_polyfills,
-    resolveDir: path.dirname(entryPoint),
-    sourcefile: 'index-with-polyfills.js',
-  };
-}
-
-const get_polyfills = () => {
-  // Just a little of backwards compatibility, will probably not try to support more versions
-  if (fs.existsSync('node_modules/react-native/Libraries/polyfills/Object.es7.js')) {
-    return `
-import 'react-native/Libraries/polyfills/console';
-import 'react-native/Libraries/polyfills/error-guard';
-import 'react-native/Libraries/polyfills/Object.es7';
-import 'react-native/Libraries/Core/InitializeCore';
-`;
-  }
-
-  return `
-import '@react-native/polyfills/console';
-import '@react-native/polyfills/error-guard';
-import '@react-native/polyfills/Object.es8';
-// When adding reanimated, without this I get "can't find variable: setImmediate"
-// May be solved by https://github.com/software-mansion/react-native-reanimated/issues/2621
-import 'react-native/Libraries/Core/InitializeCore';
-`;
-};
-
 function create_cjs_override_transform() {
   let is_done = false;
   return new Transform({
@@ -236,23 +218,34 @@ function create_cjs_override_transform() {
       }
       // It's a match!
       is_done = true;
-      callback(null, override_cjs_helper_bundle(string_content));
+      callback(null, override_cjs_helper(string_content));
     },
   });
 }
 
-function override_cjs_helper_bundle(bundle_with_runtime: string) {
+function override_cjs_helper(bundle_with_runtime: string) {
   return bundle_with_runtime.replace(
     esbuild_helper_regExp,
-    'var __commonJS = globalThis.$COMMONJS;'
-  );
-}
-
-function override_cjs_helper_hmr(hmr_bundle: string, changed_modules: string[]) {
-  return hmr_bundle.replace(
-    esbuild_helper_regExp,
-    `var __commonJS = globalThis.$COMMONJS_HOT(${JSON.stringify(changed_modules)});`
+    'var __commonJS = globalThis.$COMMONJS;\n\n' // line breaks to avoid breaking sourcemaps
   );
 }
 
 const esbuild_helper_regExp = /var __commonJS.*\n.*\n\s*};/;
+
+function compute_dep_graph_string(metafile?: esbuild.Metafile, filter?: string[]): string {
+  if (!metafile?.inputs) return '';
+
+  const inputs = metafile.inputs;
+
+  const relevant_modules = filter
+    ? Object.keys(inputs).filter(identifier => filter.includes(identifier))
+    : Object.keys(inputs);
+
+  const as_object = Object.fromEntries(
+    relevant_modules.map(key => {
+      return [key, inputs[key].imports.map(imp => imp.path)];
+    })
+  );
+
+  return `globalThis.$UPDATE_MODULE_GRAPH(${JSON.stringify(as_object, null, 2)});`;
+}

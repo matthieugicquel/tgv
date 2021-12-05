@@ -9,8 +9,15 @@ export type TransformData = {
   map?: string;
   filepath: string;
   loader: 'tsx' | 'ts' | 'jsx' | 'js';
-  is_app_code: boolean;
+  required_transforms: string[];
 };
+
+export type RequiredTransforms =
+  | 'imports'
+  | 'flow'
+  | 'reanimated2'
+  | 'react-refresh'
+  | 'classes-for-hermes';
 
 export type TransformerOptions = {
   hmr?: boolean;

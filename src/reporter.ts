@@ -1,5 +1,9 @@
 import ora from 'ora';
 import { performance } from 'perf_hooks';
+import type * as esbuild from 'esbuild';
+import { logger } from '@react-native-community/cli-tools';
+import { bgRed, bold, gray } from 'kleur';
+import path from 'path';
 
 /**
  * Show a spinner while waiting for a promise to resolve
@@ -20,4 +24,24 @@ export async function spin<T>(message: string, promise: Promise<T>): Promise<T> 
     spinner.fail();
     throw error;
   }
+}
+
+export function print_errors(error: unknown) {
+  if (is_esbuild_errors(error)) {
+    for (const e of error) {
+      e.location?.lineText;
+      const source = bold(e.pluginName || 'esbuild');
+      const file = e.location?.file ? path.basename(e.location.file) : 'unknown file';
+      const loc = bgRed(`${file}:${e.location?.line || 0}:${e.location?.column || 0}`);
+      const line = e.location?.lineText ? `\n\t${gray(e.location.lineText || '')}` : '';
+      logger.error(`${source} ${loc} ${e.text}${line}`);
+    }
+    return;
+  }
+  console.error(error);
+}
+
+function is_esbuild_errors(error: unknown): error is esbuild.Message[] {
+  if (!Array.isArray(error)) return false;
+  return error.every(e => 'pluginName' in (e as esbuild.Message));
 }
