@@ -1,24 +1,24 @@
-# TGV - an EXPERIMENTAL faster bundler and dev server for React Native
+# TGV - an experimental faster bundler and dev server for React Native, built on top of esbuild
 
-## ⚠️ This will probably not work with your app, and is very incomplete
+**⚠️ This will probably not work with your app, and may never, it's an experiment**
 
 Known limitations:
 
-- Only tested with React Native 0.63 and React Native 0.66 for now
-- May work with latest hermes (0.9 - with RN 0.66), won't work with previous hermes versions
-- Production bundles are not optimized, they will be bigger than with metro
-- Node >= 16 is required
+- You'll need a recent React Native version
+- May or may not work with latest hermes (0.9 - with RN 0.66), won't work with previous hermes versions
+- The compatibility between esbuild's output and React Native's JS runtimes is not clear yet, some JS features may break everything
 
 # Goals
 
 - A dev server that runs all day long without getting in your way. It should handle things like branch switches, `yarn install` smoothly and you should never wait for it
 - Fast bundling (a few seconds) so that OTA deploys (codepush, expo...) are fast
-- Smaller and faster prod bundles thanks to tree-shaking, ES modules scope-hoisting...
-- When this is done, build on top of it to push the React Native DX further
+- Smaller and faster prod bundles thanks to tree-shaking and ES modules scope-hoisting
 
 # Installation
 
-This package is not currently published to npm.
+TGV requires node >= 16.
+
+This package is not yet published to npm.
 
 ```sh
 git clone git@github.com:matthieugicquel/tgv.git
@@ -51,14 +51,34 @@ yarn
 
 ## Dev server
 ```sh
-yarn react-native start-tgv # This starts a dev server that replaces metro, should be done before `run-x`
-# TODO: find a way to automatically replace metro
+yarn tgv # This starts a dev server that replaces metro, do it before `run-x` so that metro doesn't start automatically
 yarn react-native run-(ios|android)
 ```
 
+## Using as the production bundler
+
+### 🍏 iOS
+
+Add `export BUNDLE_COMMAND=bundle-tgv` to the "Bundle react native code and images" script in Xcode for the app target:
+
+<img width="1397" alt="Add an export BUNDLE_COMMAND=bundle-tgv line to the bundle react native code and images script in Xcode" src="https://user-images.githubusercontent.com/10573690/145253632-f31d50e8-deab-4860-8f6c-4ce9503d8521.png">
+
+
+### 🤖 Android
+
+```groovy
+// android/app/build.gradle
+
+project.ext.react = [
+    // ...
+    bundleCommand: 'bundle-tgv'
+]
+```
+
+
 # Docs
 
-None yet, but some research is here:
+Only this READM for now yet, but some research is here:
 
 - [TODO list](./notes/todo.md)
 - [HMR](./notes/hmr.md)

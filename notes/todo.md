@@ -3,10 +3,10 @@
 - [x] Platforms (iOS, Android) handling
 - [x] Find polyfills in the right place depending on RN version
 - [x] Transpile ES features not supported by Hermes (and maybe old iOS?)
-- [ ] RN CLI plugin for bundling
-- [ ] Prod-compatible assets handling
+- [x] RN CLI plugin for bundling
+- [x] Prod-compatible assets handling
 - [ ] Clarify which Android/iOS/Hermes/React Native versions are supported
-- [ ] Reanimated 2
+- [ ] Reanimated 2 (working with small patch)
 
 ### Error handling
 
@@ -47,8 +47,9 @@
 ## Perf
 
 - [x] In-memory cache for transformers
-- [ ] On disk cache? (with parcel's watcher caching mechanism?)
-- [ ] The app start seems to be slower than with the metro build
+- [ ] On disk cache
+   - [x] Basic implementation
+   - [ ] Include used packages in cache key
 
 - [ ] Check how this behaves when running for hours/days (memory leaks...)
 
@@ -63,14 +64,21 @@
 - [ ] LogBox stack trace symbolication
 - [ ] Working source maps for all debuggers
 
+# Internal
+
+- [ ] Replace esbuild-register with real build process
+- [ ] Tests
+- [ ] Have only lazy requires in `react-native-config.js` to avoid slowing down the whole CLI
+
 # Specific issues
 
 - [x] Problem with lottie-react-native
-- "node_modules/react-native-reanimated/src/reanimated2/platform-specific/RNRenderer.ts" -> Need to replace export default with export *
+- [ ] "node_modules/react-native-reanimated/src/reanimated2/platform-specific/RNRenderer.ts" -> Need to replace export default with export *
+- [ ] Sometimes the app only "starts" after clicking in the simulator (does not happen with a metro build)
 
 # Someday
 
 - [ ] react-native-web
-- [ ] expo
-- [ ] Be more like vite: faster with dep pre-bundling and lazy requires?
+- [ ] expo support
+- [ ] Be more like vite: faster with dep pre-bundling and lazy requires by default?
 - [ ] Split bundles

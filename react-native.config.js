@@ -1,18 +1,24 @@
 require('esbuild-register');
 
-const { start_dev } = require('./src/start-dev');
-
 module.exports = {
   commands: [
     {
-      name: 'start-tgv',
+      name: 'tgv-start',
       description: 'starts the TGV dev server',
       func: async () => {
-        await start_dev({
-          port: 8081,
-          entryPoint: 'index.js',
-        });
+        const { tgv_start } = require('./src/dev-server-command');
+        await tgv_start({ port: 8081, entryPoint: 'index.js' });
       },
+      // TODO: options
+    },
+    {
+      name: 'tgv-bundle',
+      description: 'Bundle with TGV',
+      func: (...args) => {
+        const { tgv_bundle } = require('./src/prod-bundler-command');
+        return tgv_bundle(...args);
+      },
+      options: require('./src/prod-bundler/cli-args').bundle_cli_args,
     },
   ],
 };

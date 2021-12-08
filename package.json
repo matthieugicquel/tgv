@@ -1,17 +1,16 @@
 {
   "name": "tgv",
   "version": "0.0.1",
-  "main": "index.js",
   "author": "Matthieu Gicquel <matthieug@hey.com>",
   "license": "MIT",
   "private": true,
-  "scripts": {
-    "hmr-test": "node -r esbuild-register hmr-test-app/test.ts",
-    "hmr-test:serve": "node -r esbuild-register hmr-test-app/serve.ts"
+  "engines": {
+    "node": ">=16"
   },
+  "scripts": {},
   "bin": {
-    "tgv": "./bin/cli",
-    "tgv-bundle": "./bin/cli-bundle"
+    "tgv": "./bin/tgv-start",
+    "tgv-bundle": "./bin/tgv-bundle"
   },
   "dependencies": {
     "@babel/runtime": "^7.16.3",
