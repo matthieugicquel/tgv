@@ -11,7 +11,7 @@
 ### Error handling
 
 - [x] Have a strategy for readable compile errors
-- [x] Make sure babel errors look nice
+- [ ] Make sure all errors look nice
 - [ ] Detect when `yarn install` should be run
 
 # Dev server
@@ -66,9 +66,9 @@
 
 # Internal
 
-- [ ] Replace esbuild-register with real build process
+- [x] Replace esbuild-register with real build process
+- [x] Have only lazy requires in `react-native-config.js` to avoid slowing down the whole CLI
 - [ ] Tests
-- [ ] Have only lazy requires in `react-native-config.js` to avoid slowing down the whole CLI
 
 # Specific issues
 

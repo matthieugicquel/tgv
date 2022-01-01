@@ -1,12 +1,12 @@
-import http from 'http';
-import polka from 'polka';
-import * as fs from 'fs';
 import {
   createDevServerMiddleware,
   indexPageMiddleware,
 } from '@react-native-community/cli-server-api';
 import { logger } from '@react-native-community/cli-tools';
+import * as fs from 'fs';
+import http from 'http';
 import type { Socket } from 'net';
+import polka from 'polka';
 import type { WebSocketServer } from 'ws';
 
 const already_logged_missing_handlers = new Set<string>();

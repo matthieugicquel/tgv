@@ -1,13 +1,13 @@
 import type * as esbuild from 'esbuild';
 import { readFile } from 'fs/promises';
-import { StaticPool } from 'node-worker-threads-pool';
-import { cpus } from 'os';
-import { create_cached_fn } from '../utils/cached-fn';
-import { normalize_path } from '../utils/path';
-import { determine_transforms } from './transformers/determine-transforms';
-import { sucrase_transformer } from './transformers/sucrase';
-import { TransformData, TransformerOptions } from './transformers/types';
-import { lazy } from '../utils/utils';
+
+import { create_cached_fn } from '../utils/cached-fn.js';
+import { normalize_path } from '../utils/path.js';
+import { babel_with_pool } from './babel-with-pool.js';
+import { determine_transforms } from './transformers/determine-transforms.js';
+import { sucrase_transformer } from './transformers/sucrase.js';
+import { swc_transformer } from './transformers/swc.js';
+import { TransformData, TransformerOptions } from './transformers/types.js';
 
 export const transform_js_plugin = (options: TransformerOptions): esbuild.Plugin => {
   return {
@@ -21,10 +21,10 @@ export const transform_js_plugin = (options: TransformerOptions): esbuild.Plugin
 export const create_js_multitransformer = (options: TransformerOptions) => {
   return async function js_multitransformer(params: { path: string }) {
     const relative_path = normalize_path(params.path);
-    const code = await readFile(relative_path, 'utf8');
+    const code_buffer = await readFile(relative_path);
 
     try {
-      return await js_multitransformer_cached({ relative_path, code, ...options });
+      return await js_multitransformer_cached({ relative_path, code_buffer, ...options });
     } catch (error) {
       // This is probably an internal, uncontrolled error
       if (!is_transform_error(error)) throw error;
@@ -35,16 +35,16 @@ export const create_js_multitransformer = (options: TransformerOptions) => {
 
 const js_multitransformer_cached = create_cached_fn({
   cache_name: 'transform-cache',
-  id_keys: ['relative_path', 'hmr', 'hermes'],
+  id_keys: ['relative_path', 'hmr', 'jsTarget'],
   fn: async function transform(
-    input: TransformerOptions & { relative_path: string; code: string }
+    input: TransformerOptions & { relative_path: string; code_buffer: Buffer }
   ): Promise<esbuild.OnLoadResult | undefined> {
-    const { relative_path, code, ...options } = input;
+    const { relative_path, code_buffer, ...options } = input;
 
     const loader = determine_loader(relative_path);
 
     let data: TransformData = {
-      code,
+      code: code_buffer.toString(),
       filepath: relative_path,
       loader,
       required_transforms: [],
@@ -53,34 +53,39 @@ const js_multitransformer_cached = create_cached_fn({
     data.required_transforms = determine_transforms(options, data);
 
     // ⚠️ The babel reanimated plugin must run before the sucrase imports transform, otherwise it doesn't detect imports
-    if (
-      data.required_transforms.includes('reanimated2') ||
-      data.required_transforms.includes('react-refresh') ||
-      data.required_transforms.includes('classes-for-hermes')
-    ) {
-      data = await babel(data);
+    if (data.required_transforms.includes('reanimated2')) {
+      data = await babel_with_pool(data);
     }
 
-    data = sucrase_transformer(data);
+    if (data.required_transforms.includes('flow')) {
+      data = sucrase_transformer(data);
+    }
 
-    return { contents: data.code, loader };
+    if (
+      data.required_transforms.includes('react-refresh') ||
+      data.required_transforms.includes('es5-for-hermes') ||
+      data.required_transforms.includes('imports')
+    ) {
+      data = await swc_transformer(data);
+    }
+
+    // if (options.hmr) {
+    //   data.code = `${data.code}\nmodule.$FORCE_CJS = true;`;
+    // }
+
+    let warnings: esbuild.PartialMessage[] = [];
+    if (data.required_transforms.length > 0) {
+      warnings.push({
+        text: `Unhandled necessary transforms: ${data.required_transforms.join(',')}`,
+        location: {
+          file: relative_path,
+        },
+      });
+    }
+
+    return { contents: data.code, loader, warnings };
   },
 });
-
-const babel_pool = lazy(
-  () =>
-    new StaticPool({
-      // esbuild already uses lots of cpus, using 1/3 seems to be the best for perf
-      size: Math.round(cpus().length / 3),
-      task: require.resolve('./transformers/babel.worker'),
-    })
-);
-
-const babel: (input: TransformData) => Promise<TransformData> = input => babel_pool().exec(input);
-
-export async function destroy_worker_pool() {
-  await babel_pool().destroy();
-}
 
 const is_transform_error = (error: unknown): error is esbuild.PartialMessage => {
   return 'location' in (error as esbuild.PartialMessage);
@@ -113,6 +118,7 @@ const PACKAGES_WITH_JSX_IN_JS = [
   'react-native-gesture-handler',
   'react-native-share',
   '@react-native-community/art',
+  '@react-native-community/progress-bar-android',
   'react-native-code-push',
 ];
 

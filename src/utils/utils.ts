@@ -32,3 +32,7 @@ export const time = async <T>(promise: Promise<T>): Promise<[result: T, duration
   const start = performance.now();
   return [await promise, Math.round(performance.now() - start)];
 };
+
+export const dedupe = <T>(array: T[]): T[] => {
+  return [...new Set(array)];
+};

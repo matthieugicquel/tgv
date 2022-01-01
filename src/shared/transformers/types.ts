@@ -1,5 +1,7 @@
 import type * as esbuild from 'esbuild';
 
+import type { JSEngine } from '../../utils/platform.js';
+
 export type TransformerFactory = (options: TransformerOptions) => Transformer;
 
 export type Transformer = (data: TransformData) => TransformData;
@@ -9,20 +11,19 @@ export type TransformData = {
   map?: string;
   filepath: string;
   loader: 'tsx' | 'ts' | 'jsx' | 'js';
-  required_transforms: string[];
+  required_transforms: RequiredTransform[];
 };
 
-export type RequiredTransforms =
+export type RequiredTransform =
   | 'imports'
   | 'flow'
   | 'reanimated2'
   | 'react-refresh'
-  | 'classes-for-hermes';
+  | 'es5-for-hermes';
 
 export type TransformerOptions = {
   hmr?: boolean;
-  hermes?: boolean;
-  // TODO: options like "production", JSX pragma, etc
+  jsTarget: JSEngine;
 };
 
 /**

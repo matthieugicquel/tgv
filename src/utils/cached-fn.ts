@@ -1,8 +1,9 @@
+import isEqualDeep from 'fast-deep-equal';
 import { readFileSync, writeFileSync } from 'fs';
-import { isEqual } from 'lodash';
 import * as path from 'path';
 import { deserialize, serialize } from 'v8';
-import { maybe } from './utils';
+
+import { maybe } from './utils.js';
 
 type CachedFnConfig<Input, Output> = {
   cache_name: string;
@@ -25,10 +26,22 @@ export function create_cached_fn<Input, Output>(config: CachedFnConfig<Input, Ou
 
   const Cache: TCache<Input, Output> = deserialized ?? new Map();
 
+  function persist_cache() {
+    try {
+      const serialized = serialize(Cache);
+      writeFileSync(cache_path, serialized);
+    } catch (error) {
+      // Not critical
+    }
+  }
+
   process.once('SIGINT', () => {
-    const serialized = serialize(Cache);
-    writeFileSync(cache_path, serialized);
+    persist_cache();
     process.exit(0);
+  });
+
+  process.once('exit', () => {
+    persist_cache();
   });
 
   return async function cached_fn(input: Input) {
@@ -37,7 +50,7 @@ export function create_cached_fn<Input, Output>(config: CachedFnConfig<Input, Ou
     const cached = Cache.get(key_string);
 
     // Hashing the input would make the cache smaller, but is slower
-    if (cached && isEqual(cached.input, input)) {
+    if (cached && isEqualDeep(cached.input, input)) {
       return cached.result;
     }
 

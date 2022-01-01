@@ -4,12 +4,12 @@
  */
 
 // @ts-expect-error
-import DevSettings from 'react-native/Libraries/Utilities/DevSettings';
 // @ts-expect-error
 import LogBox from 'react-native/Libraries/LogBox/LogBox';
+import DevSettings from 'react-native/Libraries/Utilities/DevSettings';
 
-import type { GlobalThis } from './types';
 import type { ServerMessage } from '../ws-types';
+import type { GlobalThis } from './types';
 
 declare var globalThis: GlobalThis;
 

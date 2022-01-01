@@ -1,52 +1,55 @@
 import * as esbuild from 'esbuild';
 import * as fs from 'fs';
-import keys from 'lodash-es/keys';
+import keys from 'lodash-es/keys.js';
 import * as path from 'path';
-import { Transform, Writable } from 'stream';
-import { assets_plugin } from '../shared/plugin-assets';
-import { entry_point_plugin } from '../shared/plugin-entrypoint';
-import { hot_module_plugin } from './plugin-hot-module';
-import { inject_runtime_plugin } from './plugin-inject-runtime';
-import { transform_js_plugin } from '../shared/plugin-transform-js';
-import { compute_esbuild_options } from '../shared/esbuild-options';
+import { PassThrough, Transform, Writable } from 'stream';
 
-export type BundlerParams = {
-  entryPoint: string;
-  platform: 'ios' | 'android';
-};
+import { TGVConfig } from '../shared/config.js';
+import { compute_esbuild_options } from '../shared/esbuild-options.js';
+import { assets_plugin } from '../shared/plugin-assets.js';
+import { entry_point_plugin } from '../shared/plugin-entrypoint.js';
+import { transform_js_plugin } from '../shared/plugin-transform-js.js';
+import { module_dirname } from '../utils/path.js';
+import { hot_module_plugin } from './plugin-hot-module.js';
+import { inject_runtime_plugin } from './plugin-inject-runtime.js';
+
+export type DevBundlerParams = Pick<TGVConfig, 'entryFile' | 'platform' | 'jsTarget'>;
 
 export type DevBundler = ReturnType<typeof create_dev_bundler>;
 
-export function create_dev_bundler({ entryPoint, platform }: BundlerParams) {
+export function create_dev_bundler({ entryFile, platform, jsTarget }: DevBundlerParams) {
   const base_build_options = {
     ...compute_esbuild_options({
       platform,
+      jsTarget,
       define: {
         __DEV__: 'true',
       },
     }),
-    outdir: '.tgv-cache',
+    outdir: `.tgv-cache/${platform}-${jsTarget}`,
     treeShaking: false, // It could mess with HMR
   };
 
+  const transform_options = { jsTarget, hmr: true };
+
   const banner_promise = esbuild.build({
     ...base_build_options,
-    entryPoints: [path.join(__dirname, 'runtimes/require.runtime.ts')],
+    entryPoints: [path.join(module_dirname(import.meta), 'runtimes/require.runtime.js')],
     nodePaths: [path.join(process.cwd(), 'node_modules')], // To resolve react-refresh to the locally installed package
+    plugins: [transform_js_plugin({ ...transform_options, hmr: false })],
   });
 
   const full_options = {
     ...base_build_options,
-    entryPoints: [entryPoint],
+    entryPoints: [entryFile],
     // Going through fs is faster than going through esbuild's stdio protocol
-    // TODO: This will 💣 if multiple clients are connected at the same time
     write: true,
     incremental: true,
     plugins: [
-      entry_point_plugin(entryPoint),
+      entry_point_plugin(entryFile),
       assets_plugin({ platform }),
       inject_runtime_plugin(),
-      transform_js_plugin({ hermes: false, hmr: true }),
+      transform_js_plugin(transform_options),
     ],
   };
 
@@ -57,11 +60,19 @@ export function create_dev_bundler({ entryPoint, platform }: BundlerParams) {
 
     const hmr_plugins: esbuild.Plugin[] = [
       assets_plugin({ platform }),
-      hot_module_plugin(ClientKnownModules),
+      hot_module_plugin(ClientKnownModules, transform_options),
     ];
 
     return {
-      async build_full_bundle(code_stream: Writable) {
+      async build_full_bundle(res_stream: Writable) {
+        const code_stream = new PassThrough();
+        code_stream.pipe(res_stream);
+
+        if (true) {
+          const save_stream = fs.createWriteStream('.tgv-cache/latest-bundle.js');
+          code_stream.pipe(save_stream);
+        }
+
         try {
           ClientKnownModules.clear();
 
@@ -72,7 +83,7 @@ export function create_dev_bundler({ entryPoint, platform }: BundlerParams) {
           code_stream.write(`globalThis.$TGV_SOCKET_URL = '${socket_url}';\n`);
           code_stream.write((await banner_promise).outputFiles[1].contents);
           code_stream.write(compute_dep_graph_string(result.metafile));
-          fs.createReadStream(`.tgv-cache/${entryPoint}`, 'utf8')
+          fs.createReadStream(`${full_options.outdir}/${entryFile}`, 'utf8')
             .pipe(create_cjs_override_transform())
             .pipe(code_stream);
 
@@ -81,7 +92,11 @@ export function create_dev_bundler({ entryPoint, platform }: BundlerParams) {
         } catch (error) {
           ClientKnownModules.clear();
           code_stream.end(`throw new Error('\\n\\n🤷 Build failed, check your terminal');`);
-          throw (error as esbuild.BuildFailure).errors;
+
+          if ('errors' in (error as esbuild.BuildFailure)) {
+            throw (error as esbuild.BuildFailure).errors;
+          }
+          throw error;
         }
       },
       /**

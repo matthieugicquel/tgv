@@ -1,22 +1,22 @@
 # TGV - an experimental faster bundler and dev server for React Native, built on top of esbuild
 
-**⚠️ This will probably not work with your app, and may never, it's an experiment**
+**⚠️ This is experimental, you probably don't want to use it for anything serious right now**
 
 Known limitations:
 
 - You'll need a recent React Native version
-- May or may not work with latest hermes (0.9 - with RN 0.66), won't work with previous hermes versions
 - The compatibility between esbuild's output and React Native's JS runtimes is not clear yet, some JS features may break everything
+- Some very useful features like stack trace symbolication are not yet implemented
 
 # Goals
 
 - A dev server that runs all day long without getting in your way. It should handle things like branch switches, `yarn install` smoothly and you should never wait for it
-- Fast bundling (a few seconds) so that OTA deploys (codepush, expo...) are fast
+- Fast bundling (a few seconds) so that JS deploys (codepush, expo...) are fast
 - Smaller and faster prod bundles thanks to tree-shaking and ES modules scope-hoisting
 
 # Installation
 
-TGV requires node >= 16.
+Node >= 16 is required.
 
 This package is not yet published to npm.
 
@@ -47,11 +47,40 @@ yarn link tgv
 yarn
 ```
 
+Then add to react-native.config.js: (or create it)
+
+```js
+/**
+ * See type definition for full config options
+ * @type {import('tgv/config').TGVConfigDef}
+ */
+const tgvConfig = {
+  ios: {
+    jsTarget: 'jsc', // or hermes
+  },
+  android: {
+    jsTarget: 'hermes', // or jsc
+  },
+  transformPackages: {
+    flow: [],
+    jsxInJs: [],
+  }
+};
+
+module.exports = {
+  commands: require('tgv/commands')(tgvConfig),
+  // other react-native config options
+};
+
+```
+
 # Usage
 
 ## Dev server
 ```sh
-yarn tgv # This starts a dev server that replaces metro, do it before `run-x` so that metro doesn't start automatically
+# This starts a dev server that replaces metro, do it before `run-x` so that metro doesn't start automatically
+yarn react-native tgv-start
+
 yarn react-native run-(ios|android)
 ```
 
@@ -74,7 +103,6 @@ project.ext.react = [
     bundleCommand: 'bundle-tgv'
 ]
 ```
-
 
 # Docs
 

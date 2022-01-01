@@ -1,11 +1,13 @@
-import type * as esbuild from 'esbuild';
-import { readFile, readdir, copyFile, mkdir } from 'fs/promises';
-import image_size from 'image-size';
-import { normalize_path } from '../utils/path';
-import * as path from 'path';
-import { select } from '../utils/utils';
-import getAssetDestPathAndroid from './assets/getAssetsDestPathAndroid';
 import { logger } from '@react-native-community/cli-tools';
+import type * as esbuild from 'esbuild';
+import { copyFile, mkdir, readdir, readFile } from 'fs/promises';
+import image_size from 'image-size';
+import * as path from 'path';
+
+import { create_cached_fn } from '../utils/cached-fn.js';
+import { normalize_path } from '../utils/path.js';
+import { select } from '../utils/utils.js';
+import getAssetDestPathAndroid from './assets/getAssetsDestPathAndroid.js';
 
 // TODO: support all image types (and maybe other assets?)
 export const asset_extensions = ['.png'];
@@ -21,8 +23,8 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
   return {
     name: 'assets',
     setup(build) {
-      build.onResolve({ filter: assets_regExp }, ({ path, resolveDir }) => {
-        const asset_path = require('path').resolve(resolveDir, path);
+      build.onResolve({ filter: assets_regExp }, ({ path: filepath, resolveDir }) => {
+        const asset_path = path.resolve(resolveDir, filepath);
         return { path: asset_path, namespace: 'assets' };
       });
 
@@ -31,7 +33,8 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
 
         const dir = path.dirname(relative_path);
 
-        const files = await parse_dir(dir);
+        const files_list = await readdir(dir);
+        const files = await parse_dir_cached({ dir, files: files_list });
 
         const size = image_size(await readFile(relative_path));
 
@@ -60,7 +63,7 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
               android: path.join(assets_dest, getAssetDestPathAndroid(asset, scale)),
             });
 
-            logger.info('writing asset to', dest);
+            logger.debug('writing asset to', dest);
 
             await mkdir(path.dirname(dest), { recursive: true });
             await copyFile(files[relative_path].on_disk_path[scale], dest);
@@ -68,7 +71,7 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
         }
 
         const contents = `
-const { registerAsset } = require('react-native/Libraries/Image/AssetRegistry.js');
+var registerAsset = require('react-native/Libraries/Image/AssetRegistry.js').registerAsset;
 module.exports = registerAsset(${JSON.stringify(asset, null, 2)});
 `;
 
@@ -82,47 +85,49 @@ module.exports = registerAsset(${JSON.stringify(asset, null, 2)});
   };
 };
 
-async function parse_dir(dir: string) {
-  const files = await readdir(dir);
+const parse_dir_cached = create_cached_fn({
+  cache_name: 'assets-dirs-cache',
+  id_keys: ['dir'],
+  fn: function parse_dir({ dir, files }: { dir: string; files: string[] }) {
+    const files_info = files.map(filename => {
+      const on_disk_path = path.join(dir, filename);
+      const parsed_path = path.parse(on_disk_path);
+      const { name, scale } = parse_basename(parsed_path.name);
 
-  const files_info = files.map(filename => {
-    const on_disk_path = path.join(dir, filename);
-    const parsed_path = path.parse(on_disk_path);
-    const { name, scale } = parse_basename(parsed_path.name);
-
-    return {
-      name,
-      scale,
-      type: parsed_path.ext.replace('.', ''),
-      on_disk_path,
-    };
-  });
-
-  const assets: {
-    [name: string]: Pick<PackagerAsset, 'name' | 'type' | 'scales'> & {
-      on_disk_path: { [scale: number]: string };
-    };
-  } = {};
-
-  for (const info of files_info) {
-    const { name, type, scale, on_disk_path } = info;
-
-    const normalized_path = path.join(dir, `${name}.${type}`);
-
-    if (!assets[normalized_path]) {
-      assets[normalized_path] = {
+      return {
         name,
-        type,
-        scales: [],
-        on_disk_path: {},
+        scale,
+        type: parsed_path.ext.replace('.', ''),
+        on_disk_path,
       };
-    }
+    });
 
-    assets[normalized_path].scales.push(scale);
-    assets[normalized_path].on_disk_path[scale] = on_disk_path;
-  }
-  return assets;
-}
+    const assets: {
+      [name: string]: Pick<PackagerAsset, 'name' | 'type' | 'scales'> & {
+        on_disk_path: { [scale: number]: string };
+      };
+    } = {};
+
+    for (const info of files_info) {
+      const { name, type, scale, on_disk_path } = info;
+
+      const normalized_path = path.join(dir, `${name}.${type}`);
+
+      if (!assets[normalized_path]) {
+        assets[normalized_path] = {
+          name,
+          type,
+          scales: [],
+          on_disk_path: {},
+        };
+      }
+
+      assets[normalized_path].scales.push(scale);
+      assets[normalized_path].on_disk_path[scale] = on_disk_path;
+    }
+    return assets;
+  },
+});
 
 /**
  * From https://github.com/facebook/metro/blob/9bbe219809c2bdfdb949e825817e2522e099ff9f/packages/metro/src/node-haste/lib/AssetPaths.js

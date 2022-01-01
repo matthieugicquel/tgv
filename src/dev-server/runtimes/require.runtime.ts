@@ -4,6 +4,7 @@
  */
 
 import Refresh from 'react-refresh/runtime';
+
 import type { GlobalThis, ModuleFn } from './types';
 
 declare var globalThis: GlobalThis;

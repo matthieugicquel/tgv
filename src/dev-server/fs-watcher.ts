@@ -1,5 +1,6 @@
 import watcher from '@parcel/watcher';
-import { normalize_path } from '../utils/path';
+
+import { normalize_path } from '../utils/path.js';
 
 export async function watch_fs(where: string, callback: (changed_files: string[]) => void) {
   const subscription = await watcher.subscribe(where, (error, events) => {

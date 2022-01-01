@@ -32,28 +32,3 @@ https://github.com/evanw/esbuild/issues/645#issuecomment-797143417
 https://github.com/progrium/hotweb/blob/master/pkg/jsexports/jsexports.go
 
 https://github.com/expo/expo-cli/pull/3659
-
-# Module wrapping
-
-```ts
-// An alternative to the current wrappers injected with a build plugin: overriding the esbuild __commonJS wrapper function
-// Not used right now
-globalThis.$REQUIRE = (callback_obj: { [key: string]: ModuleFn }) => () => {
-  const identifier = Object.keys(callback_obj)[0];
-
-  if (ModuleResultCache.has(identifier)) {
-    return ModuleResultCache.get(identifier)?.exports;
-  }
-
-  const module_fn = callback_obj[identifier];
-  const _module = { exports: {} };
-  try {
-    module_fn(_module.exports, _module);
-    ModuleRunCache.set(identifier, module_fn);
-    ModuleResultCache.set(identifier, _module);
-  } catch (error) {
-    console.error(error);
-  }
-  return _module.exports;
-};
-```

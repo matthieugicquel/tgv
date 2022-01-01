@@ -1,15 +1,16 @@
 import { logger } from '@react-native-community/cli-tools';
-import WebSocket from 'ws';
-import { ServerMessage } from './ws-types';
+import WebSocket, { WebSocketServer } from 'ws';
+
+import type { ServerMessage } from './ws-types';
 
 type Params = {
   port: number;
   client_id: string;
-  attach: (path: string, wss: WebSocket.Server) => void;
+  attach: (path: string, wss: WebSocketServer) => void;
   on_close: () => void;
 };
 export function create_hmr_wss({ port, client_id, attach, on_close }: Params) {
-  const wss = new WebSocket.Server({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true });
 
   attach(`/hmr/${client_id}`, wss);
 

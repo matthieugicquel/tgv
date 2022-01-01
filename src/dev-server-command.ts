@@ -1,65 +1,66 @@
-import { create_dev_bundler, DevBundler, BundlerParams } from './dev-server/dev-bundler';
-import { print_errors, spin } from './utils/console';
-import { create_http_server } from './dev-server/serve-http';
-import { watch_fs } from './dev-server/fs-watcher';
+import { logger } from '@react-native-community/cli-tools';
 import crypto from 'crypto';
 import * as fs from 'fs';
-import { logger } from '@react-native-community/cli-tools';
-import { create_hmr_wss } from './dev-server/serve-hmr-socket';
-import { time } from './utils/utils';
-import { assert_supported_platform } from './utils/platform';
+import { writeFile } from 'fs/promises';
 
-type Params = {
-  port: number;
-  entryPoint: string;
-};
+import type { TGVConfigDef } from '../config.js';
+import { create_dev_bundler, DevBundler, DevBundlerParams } from './dev-server/dev-bundler.js';
+import { watch_fs } from './dev-server/fs-watcher.js';
+import { create_hmr_wss } from './dev-server/serve-hmr-socket.js';
+import { create_http_server } from './dev-server/serve-http.js';
+import { compute_config } from './shared/config.js';
+import { print_errors, spin } from './utils/console.js';
+import { time } from './utils/utils.js';
 
-export async function tgv_start(_: unknown, __: unknown, { port, entryPoint }: Params) {
+export async function tgv_start(config_def: TGVConfigDef) {
+  const { serverPort } = compute_config(config_def, {});
+
   if (!fs.existsSync('.tgv-cache')) fs.mkdirSync('.tgv-cache');
 
-  const { server, attach_wss } = create_http_server(port);
+  const { server, attach_wss } = create_http_server(serverPort);
 
   server.get('/index.bundle', async function bundle_request(req, res) {
     try {
-      const platform = req.query.platform;
-      if (typeof platform !== 'string') throw 'Invalid query';
-      assert_supported_platform(platform);
-
-      const client_id = generate_client_id();
+      const query_platform = req.query.platform;
+      if (typeof query_platform !== 'string') throw 'Invalid query';
+      const config = compute_config(config_def, { platform: query_platform });
 
       res.writeHead(200, { 'Content-Type': 'application/javascript' });
 
       let watcher: ReturnType<typeof watch_fs> | undefined;
 
       const hmr = create_hmr_wss({
-        client_id,
-        port,
+        client_id: generate_client_id(),
+        port: serverPort,
         attach: attach_wss,
         async on_close() {
           (await watcher)?.unsubscribe();
         },
       });
 
-      const { build_full_bundle, build_hmr_payload } = get_bundler({ platform, entryPoint })(
-        hmr.socket_url
-      );
+      const { build_full_bundle, build_hmr_payload } = get_bundler(config)(hmr.socket_url);
 
-      await spin(`📦 Bundling ${entryPoint} for ${platform}`, build_full_bundle(res));
+      await spin(`📦 Bundling ${config.entryFile} for ${config.platform}`, build_full_bundle(res));
 
       let has_error = false;
 
       watcher = watch_fs(process.cwd(), async changed_files => {
         try {
           const [result, duration] = await time(build_hmr_payload(changed_files));
-          if (!result) return;
+
+          if (!result) return; // This means changed files were not relevant to the bundle
+
           if (has_error) {
             has_error = false;
             logger.success('Error fixed, serving hot modules again');
           }
+
           hmr.send_update(result.modules_to_hot_replace, result.code);
+
           logger.debug(
             `♻️  Hot reloaded ${result.modules_to_hot_replace.length} files in ${duration}ms`
           );
+          if (logger.isVerbose()) await writeFile('.tgv-cache/latest-hmr.js', result.code);
         } catch (error) {
           has_error = true;
           print_errors(error);
@@ -70,9 +71,9 @@ export async function tgv_start(_: unknown, __: unknown, { port, entryPoint }: P
     }
   });
 
-  server.listen(port, 'localhost');
+  server.listen(serverPort, 'localhost');
 
-  logger.success(`👋 Hello, serving on port ${port}`);
+  logger.success(`👋 Hello, serving on port ${serverPort}`);
 
   // TODO: make sure we cleanup the server even on forced exit
   return server;
@@ -84,7 +85,7 @@ function generate_client_id() {
 
 const bundlers = new Map<string, DevBundler>();
 
-function get_bundler(options: BundlerParams) {
+function get_bundler(options: DevBundlerParams) {
   const key = JSON.stringify(options, Object.keys(options).sort());
   if (!bundlers.has(key)) {
     // TODO: maybe we should free the resources at some point?

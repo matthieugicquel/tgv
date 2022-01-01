@@ -1,10 +1,12 @@
-import type { RequiredTransforms, TransformData, TransformerOptions } from './types';
+import { without } from 'lodash-es';
+
+import type { RequiredTransform, TransformData, TransformerOptions } from './types';
 
 export function determine_transforms(
   options: TransformerOptions,
   input: TransformData
-): RequiredTransforms[] {
-  const transforms: RequiredTransforms[] = [];
+): RequiredTransform[] {
+  const transforms: RequiredTransform[] = [];
 
   const is_app_code = !input.filepath.includes('node_modules/');
 
@@ -22,8 +24,8 @@ export function determine_transforms(
   }
 
   // hermes doesn't fully support classes, esbuild doesn't transform them.
-  if (options.hermes && input.code.includes('class ')) {
-    transforms.push('classes-for-hermes');
+  if (options.jsTarget === 'hermes') {
+    transforms.push('es5-for-hermes');
   }
 
   if (
@@ -40,6 +42,29 @@ export function determine_transforms(
   }
 
   return transforms;
+}
+
+export function adjust_transforms_from_file_contents(input: TransformData): TransformData {
+  let transforms = [...input.required_transforms];
+
+  if (input.required_transforms.includes('reanimated2')) {
+    // esbuild doesn't transform flow
+    if (!workletize_code_RegExp.test(input.code)) {
+      transforms = without(transforms, 'reanimated2');
+    }
+  }
+
+  if (input.required_transforms.includes('imports')) {
+    // esbuild doesn't transform flow
+    if (!is_esm_RegExp.test(input.code)) {
+      transforms = without(transforms, 'imports');
+    }
+  }
+
+  return {
+    ...input,
+    required_transforms: transforms,
+  };
 }
 
 const is_esm_RegExp = /export(\s(let|const|function|class|default)|\s?(\*|\{))/; // https://regex101.com/r/qtKiHY/1
@@ -59,6 +84,8 @@ const PACKAGES_WITH_FLOW = [
   'react-native-share',
   'rn-fetch-blob',
   '@react-native-community/art',
+  '@react-native-community/progress-bar-android',
+  'react-native-torch',
   'react-native-pdf',
 ];
 

@@ -1,6 +1,8 @@
-import type { TransformData, TransformError } from './types';
+import without from 'lodash-es/without.js';
 import * as sucrase from 'sucrase';
-import { select } from '../../utils/utils';
+
+import { select } from '../../utils/utils.js';
+import type { TransformData, TransformError } from './types';
 
 export function sucrase_transformer(input: TransformData): TransformData {
   const necessary_transforms: sucrase.Transform[] = [];
@@ -8,9 +10,9 @@ export function sucrase_transformer(input: TransformData): TransformData {
   // We need to transform everything to CJS for our HMR hacks to work
   // The sucrase 'imports' transform adds "use strict" even when doing nothing, this can cause problems, for instance with react-native-safe-modules (used by lottie)
   // So only apply the transform when necessary
-  if (input.required_transforms.includes('imports')) {
-    necessary_transforms.push('imports');
-  }
+  // if (input.required_transforms.includes('imports')) {
+  //   necessary_transforms.push('imports');
+  // }
 
   // esbuild doesn't transform flow right now
   if (input.required_transforms.includes('flow')) {
@@ -37,11 +39,13 @@ export function sucrase_transformer(input: TransformData): TransformData {
     });
     return {
       ...input,
+      required_transforms: without(input.required_transforms, 'flow'),
       loader: 'js',
       code: transformed.code,
       // TODO: sourcemaps? sucrase preserves line so this isn't critical I think
     };
   } catch (error) {
+    console.log('hello sucrase');
     if (!is_sucrase_error(error)) throw error;
 
     const lineText = input.code.split('\n')[error.loc.line - 1];

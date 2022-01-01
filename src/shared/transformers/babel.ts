@@ -1,15 +1,16 @@
-import { lazy, select } from '../../utils/utils';
-import type { TransformData, TransformError } from './types';
 import type * as babel from '@babel/core';
 import type { ParserPlugin } from '@babel/parser';
+import without from 'lodash-es/without.js';
+import { createRequire } from 'module';
+
+import { lazy, select } from '../../utils/utils.js';
+import type { TransformData, TransformError } from './types';
+
+const require = createRequire(import.meta.url);
 
 const babel_core = lazy(() => {
   const babel_path = require.resolve('@babel/core', { paths: [process.cwd()] });
   return require(babel_path) as typeof import('@babel/core');
-});
-
-const hermes_classes_plugins = lazy(() => {
-  return [babel_core().createConfigItem('@babel/plugin-transform-classes', { type: 'plugin' })];
 });
 
 const reanimated_plugins = lazy(() => {
@@ -26,16 +27,6 @@ const react_refresh_plugins = lazy(() => {
 
 export function babel_transformer(input: TransformData) {
   const plugins: babel.ConfigItem[] = [];
-
-  // Adding this transform significantly increases build time
-  // Maybe improve the check or implement it in esbuild or use swc?
-  if (input.required_transforms.includes('classes-for-hermes')) {
-    try {
-      plugins.push(...hermes_classes_plugins());
-    } catch (error) {
-      console.warn('Babel plugins necessary for hermes seem to be missing', error);
-    }
-  }
 
   if (input.required_transforms.includes('reanimated2')) {
     try {
@@ -79,6 +70,7 @@ export function babel_transformer(input: TransformData) {
 
     return {
       ...input,
+      required_transforms: without(input.required_transforms, 'react-refresh', 'reanimated2'),
       code: result.code,
       // TODO: sourcemaps
     };

@@ -1,24 +1,30 @@
 import { existsSync, mkdirSync } from 'fs';
-import { destroy_worker_pool } from './shared/plugin-transform-js';
-import { assert_supported_platform } from './utils/platform';
-import { spin } from './utils/console';
-import { BundleCLIArgs } from './prod-bundler/cli-args';
-import { bundle } from './prod-bundler/bundle-with-esbuild';
 
-export async function tgv_bundle(_: unknown, _config: unknown, args: BundleCLIArgs) {
-  assert_supported_platform(args.platform);
+import type { TGVConfigDef } from '../config.js';
+import { bundle } from './prod-bundler/bundle-with-esbuild.js';
+import { destroy_worker_pool } from './shared/babel-with-pool.js';
+import { BundleCLIArgs, compute_config } from './shared/config.js';
+import { print_errors, spin } from './utils/console.js';
+
+export async function tgv_bundle(args: BundleCLIArgs, config_def: TGVConfigDef) {
+  const config = compute_config(config_def, args);
 
   if (!existsSync('.tgv-cache')) mkdirSync('.tgv-cache');
 
-  await spin(
-    `📦 Bundling ${args.entryFile} for ${args.platform}`,
-    bundle({
-      platform: args.platform,
-      entryPoint: args.entryFile,
-      outfile: args.bundleOutput,
-      assets_dest: args.assetsDest,
-    })
-  );
+  try {
+    await spin(
+      `📦 Bundling ${args.entryFile} for ${args.platform} (${config.jsTarget})`,
+      bundle({
+        platform: config.platform,
+        jsTarget: config.jsTarget,
+        entryPoint: config.entryFile,
+        outfile: args.bundleOutput,
+        assets_dest: args.assetsDest,
+      })
+    );
+  } catch (error) {
+    print_errors(error);
+  }
 
   await destroy_worker_pool();
 }

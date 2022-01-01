@@ -5,3 +5,5 @@ export function assert_supported_platform(platform: string): asserts platform is
 }
 
 export type SupportedPlatform = 'ios' | 'android';
+
+export type JSEngine = 'jsc' | 'hermes';

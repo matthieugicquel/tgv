@@ -2,6 +2,9 @@ import type * as esbuild from 'esbuild';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 
+import { swc_transformer } from '../shared/transformers/swc.js';
+import { module_dirname } from '../utils/path.js';
+
 /**
  * Replace the refresh setup included in react-native with ours
  * Doing it this ways has 2 benefits:
@@ -15,9 +18,15 @@ export const inject_runtime_plugin = (): esbuild.Plugin => {
       // TODO: better RegExp
       build.onLoad({ filter: new RegExp('setUpReactRefresh') }, async () => {
         // We don't use an onResolve callback because we want this file to be in the context of the files it replaces when it comes to resolving
-        const filepath = path.join(__dirname, 'runtimes/ws-client.runtime.ts');
-        const contents = await readFile(filepath, 'utf8');
-        return { contents, loader: 'ts' };
+        const filepath = path.join(module_dirname(import.meta), 'runtimes/ws-client.runtime.js');
+        const original = await readFile(filepath, 'utf8');
+        const transformed = await swc_transformer({
+          code: original,
+          filepath,
+          loader: 'ts',
+          required_transforms: ['es5-for-hermes', 'imports'],
+        });
+        return { contents: transformed.code, loader: 'ts' };
       });
 
       // TODO: inject something that allows logging, like expected by node_modules/react-native/Libraries/Core/setUpDeveloperTools.js
