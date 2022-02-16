@@ -9,7 +9,7 @@ import { normalize_path } from '../utils/path.js';
 import { select } from '../utils/utils.js';
 import getAssetDestPathAndroid from './assets/getAssetsDestPathAndroid.js';
 
-const image_extensions = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'psd', 'svg', 'tiff'];
+const image_extensions = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'psd', 'tiff'];
 
 export const asset_extensions = [
   ...image_extensions,

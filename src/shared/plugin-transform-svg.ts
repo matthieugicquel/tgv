@@ -5,15 +5,17 @@ import { dirname } from 'path';
 
 import { normalize_path } from '../utils/path.js';
 import { lazy } from '../utils/utils.js';
+import { swc_transformer } from './transformers/swc.js';
+import { TransformerOptions } from './transformers/types.js';
 
 const require = createRequire(import.meta.url);
 
 const svgr = lazy(() => {
   const module_path = require.resolve('@svgr/core', { paths: [process.cwd()] });
-  return require(module_path) as typeof import('@svgr/core');
+  return require(module_path); // TODO: type this
 });
 
-export const svg_plugin = (): esbuild.Plugin => {
+export const svg_plugin = (js_transform_options: TransformerOptions): esbuild.Plugin => {
   return {
     name: 'svg',
     setup(build) {
@@ -22,15 +24,19 @@ export const svg_plugin = (): esbuild.Plugin => {
         const config = user_config ? { ...defaultSVGRConfig, ...user_config } : defaultSVGRConfig;
 
         const relative_path = normalize_path(params.path);
-        const code = await readFile(relative_path, 'utf8');
+        const source = await readFile(relative_path, 'utf8');
 
-        const contents = await svgr().transform(code, config);
+        const js = await svgr().transform(source, config);
 
-        return {
-          contents,
-          resolveDir: process.cwd(),
+        // TODO
+        const transformed = await swc_transformer({
+          code: js,
+          filepath: relative_path,
           loader: 'jsx',
-        };
+          required_transforms: ['imports', 'es5-for-hermes'],
+        });
+
+        return { contents: transformed.code, loader: 'js' };
       });
     },
   };

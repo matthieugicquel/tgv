@@ -36,7 +36,7 @@ export async function bundle(params: Params): Promise<void> {
       plugins: [
         entry_point_plugin(entryPoint),
         assets_plugin({ assets_dest, platform }),
-        svg_plugin(),
+        svg_plugin({ jsTarget, hmr: false, transformPackages }),
         transform_js_plugin({ jsTarget, hmr: false, transformPackages }),
       ],
     });

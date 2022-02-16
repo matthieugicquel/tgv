@@ -57,7 +57,7 @@ export function create_dev_bundler({
     plugins: [
       entry_point_plugin(entryFile),
       assets_plugin({ platform }),
-      svg_plugin(),
+      svg_plugin(transform_options),
       inject_runtime_plugin(),
       transform_js_plugin(transform_options),
     ],
