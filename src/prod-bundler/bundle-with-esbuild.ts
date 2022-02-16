@@ -5,6 +5,7 @@ import { compute_esbuild_options } from '../shared/esbuild-options.js';
 import { assets_plugin } from '../shared/plugin-assets.js';
 import { entry_point_plugin } from '../shared/plugin-entrypoint.js';
 import { transform_js_plugin } from '../shared/plugin-transform-js.js';
+import { svg_plugin } from '../shared/plugin-transform-svg.js';
 import { JSEngine, SupportedPlatform } from '../utils/platform.js';
 
 type Params = {
@@ -35,6 +36,7 @@ export async function bundle(params: Params): Promise<void> {
       plugins: [
         entry_point_plugin(entryPoint),
         assets_plugin({ assets_dest, platform }),
+        svg_plugin(),
         transform_js_plugin({ jsTarget, hmr: false, transformPackages }),
       ],
     });
