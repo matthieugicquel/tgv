@@ -45,7 +45,6 @@ export function sucrase_transformer(input: TransformData): TransformData {
       // TODO: sourcemaps? sucrase preserves line so this isn't critical I think
     };
   } catch (error) {
-    console.log('hello sucrase');
     if (!is_sucrase_error(error)) throw error;
 
     const lineText = input.code.split('\n')[error.loc.line - 1];

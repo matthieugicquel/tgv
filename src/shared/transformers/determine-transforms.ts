@@ -19,7 +19,10 @@ export function determine_transforms(
   }
 
   // esbuild doesn't transform flow
-  if ((input.loader === 'jsx' || input.loader === 'js') && flow_RegExp.test(input.filepath)) {
+  if (
+    (input.loader === 'jsx' || input.loader === 'js') &&
+    flow_RegExp(options.transformPackages.flow).test(input.filepath)
+  ) {
     transforms.push('flow');
   }
 
@@ -73,20 +76,6 @@ const workletize_code_RegExp = new RegExp(
   `("worklet"|'worklet'|useAnimatedStyle|useAnimatedProps|createAnimatedPropAdapter|useDerivedValue|useAnimatedScrollHandler|useAnimatedReaction|useWorkletCallback|createWorklet|withTiming|withSpring|withDecay|withRepeat|useAnimatedGestureHandler|useAnimatedScrollHandler)`
 );
 
-const PACKAGES_WITH_FLOW = [
-  'react-native',
-  '@react-native',
-  'react-native-screens',
-  'react-native-code-push',
-  'react-native-gesture-handler',
-  'react-native-mixpanel',
-  '@react-native-async-storage/async-storage',
-  'react-native-share',
-  'rn-fetch-blob',
-  '@react-native-community/art',
-  '@react-native-community/progress-bar-android',
-  'react-native-torch',
-  'react-native-pdf',
-];
-
-const flow_RegExp = new RegExp(`node_modules/(${PACKAGES_WITH_FLOW.join('|')})/.*(.js)$`);
+const flow_RegExp = (packages: string[]) => {
+  return new RegExp(`node_modules/(${packages.join('|')})/.*(.js)$`);
+};

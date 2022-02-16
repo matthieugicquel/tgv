@@ -20,6 +20,7 @@ export async function tgv_bundle(args: BundleCLIArgs, config_def: TGVConfigDef) 
         entryPoint: config.entryFile,
         outfile: args.bundleOutput,
         assets_dest: args.assetsDest,
+        transformPackages: config.transformPackages,
       })
     );
   } catch (error) {

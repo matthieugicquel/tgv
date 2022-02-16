@@ -48,7 +48,6 @@ export async function swc_transformer(input: TransformData): Promise<TransformDa
       code: transformed.code,
     };
   } catch (error) {
-    console.log('hello swc', error);
     throw error;
   }
 }

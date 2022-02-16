@@ -1,16 +1,19 @@
 import type * as esbuild from 'esbuild';
 
 import type { JSEngine } from '../../utils/platform.js';
+import { TGVConfig } from '../config.js';
 
 export type TransformerFactory = (options: TransformerOptions) => Transformer;
 
 export type Transformer = (data: TransformData) => TransformData;
 
+export type Loader = 'js' | 'jsx' | 'ts' | 'tsx';
+
 export type TransformData = {
   code: string;
   map?: string;
   filepath: string;
-  loader: 'tsx' | 'ts' | 'jsx' | 'js';
+  loader: Loader;
   required_transforms: RequiredTransform[];
 };
 
@@ -24,6 +27,7 @@ export type RequiredTransform =
 export type TransformerOptions = {
   hmr?: boolean;
   jsTarget: JSEngine;
+  transformPackages: TGVConfig['transformPackages'];
 };
 
 /**

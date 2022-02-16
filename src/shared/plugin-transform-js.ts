@@ -7,7 +7,7 @@ import { babel_with_pool } from './babel-with-pool.js';
 import { determine_transforms } from './transformers/determine-transforms.js';
 import { sucrase_transformer } from './transformers/sucrase.js';
 import { swc_transformer } from './transformers/swc.js';
-import { TransformData, TransformerOptions } from './transformers/types.js';
+import { Loader, TransformData, TransformerOptions } from './transformers/types.js';
 
 export const transform_js_plugin = (options: TransformerOptions): esbuild.Plugin => {
   return {
@@ -41,7 +41,7 @@ const js_multitransformer_cached = create_cached_fn({
   ): Promise<esbuild.OnLoadResult | undefined> {
     const { relative_path, code_buffer, ...options } = input;
 
-    const loader = determine_loader(relative_path);
+    const loader = determine_loader(relative_path, input.transformPackages.jsxInJs);
 
     let data: TransformData = {
       code: code_buffer.toString(),
@@ -91,35 +91,14 @@ const is_transform_error = (error: unknown): error is esbuild.PartialMessage => 
   return 'location' in (error as esbuild.PartialMessage);
 };
 
-function determine_loader(path: string): 'ts' | 'tsx' | 'js' | 'jsx' {
+function determine_loader(path: string, transformPackages: string[]): Loader {
   if (path.endsWith('.ts')) return 'ts';
   if (path.endsWith('.tsx')) return 'tsx';
   if (path.endsWith('.jsx')) return 'jsx';
-  if (jsx_in_js_RegExp.test(path)) return 'jsx';
+  if (jsx_in_js_RegExp(transformPackages).test(path)) return 'jsx';
   return 'js';
 }
 
-const PACKAGES_WITH_JSX_IN_JS = [
-  'react-native',
-  '@react-native',
-  'react-native-keyboard-spacer',
-  '@sentry/react-native',
-  'react-native-pdf',
-  'react-native-snap-carousel',
-  'react-native-collapsible',
-  'react-native-webview',
-  'react-native-material-textfield',
-  'react-native-google-places-autocomplete',
-  'react-native-neomorph-shadows',
-  'react-native-swipe-gestures',
-  'react-native-reanimated',
-  'react-native-animatable',
-  'react-native-screens',
-  'react-native-gesture-handler',
-  'react-native-share',
-  '@react-native-community/art',
-  '@react-native-community/progress-bar-android',
-  'react-native-code-push',
-];
-
-const jsx_in_js_RegExp = new RegExp(`node_modules/(${PACKAGES_WITH_JSX_IN_JS.join('|')})/.*(.js)$`);
+const jsx_in_js_RegExp = (packages: string[]) => {
+  return new RegExp(`node_modules/(${packages.join('|')})/.*(.js)$`);
+};
