@@ -9,8 +9,31 @@ import { normalize_path } from '../utils/path.js';
 import { select } from '../utils/utils.js';
 import getAssetDestPathAndroid from './assets/getAssetsDestPathAndroid.js';
 
-// TODO: support all image types (and maybe other assets?)
-export const asset_extensions = ['.png'];
+const image_extensions = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'psd', 'svg', 'tiff'];
+
+export const asset_extensions = [
+  ...image_extensions,
+  'm4v',
+  'mov',
+  'mp4',
+  'mpeg',
+  'mpg',
+  'webm',
+  'aac',
+  'aiff',
+  'caf',
+  'm4a',
+  'mp3',
+  'wav',
+  'html',
+  'pdf',
+  'yaml',
+  'yml',
+  'otf',
+  'ttf',
+  'zip',
+  'db',
+];
 
 const assets_regExp = new RegExp(`\\.*(${asset_extensions.join('|')})$`);
 
@@ -36,7 +59,9 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
         const files_list = await readdir(dir);
         const files = await parse_dir_cached({ dir, files: files_list });
 
-        const size = image_size(await readFile(relative_path));
+        const size = image_extensions.includes(files[relative_path].type)
+          ? image_size(await readFile(relative_path))
+          : undefined;
 
         // See tests here for exepcted output https://github.com/facebook/react-native/blob/77ecc7ede1da8fc590d7bc238a2fc02daa736746/Libraries/Image/__tests__/resolveAssetSource-test.js
         const asset_location_dir = `/assets/${dir}`;
@@ -44,8 +69,8 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
           __packager_asset: true,
           httpServerLocation: asset_location_dir,
           hash: 'tgv-asset', // TODO, if this is useful
-          width: size.width,
-          height: size.height,
+          width: size?.width,
+          height: size?.height,
           name: files[relative_path].name,
           type: files[relative_path].type,
           scales: files[relative_path].scales,
@@ -53,7 +78,6 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
 
         if (assets_dest) {
           for (const scale of asset.scales.filter(filter_scales(platform))) {
-            // TODO: Android
             const dest = select(platform, {
               ios: path.join(
                 assets_dest,

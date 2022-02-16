@@ -71,9 +71,10 @@ export function create_http_server(port: number) {
 
   server.get('/assets/*', (req, res) => {
     const fs_path = req.path.replace('/assets/', '');
+    const extension = req.path.split('.').pop()?.toLowerCase();
+
     logger.debug(`🖼  Serving asset ${fs_path}`);
-    // TODO: support all extensions, or maybe setting the content-type is not necessary?
-    res.writeHead(200, { 'Content-type': 'image/png' });
+    res.writeHead(200, { 'Content-type': `image/${extension}` });
     fs.createReadStream(fs_path).pipe(res);
   });
 
