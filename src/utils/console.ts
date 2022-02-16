@@ -34,13 +34,14 @@ export async function spin<T>(message: string, promise: Promise<T>): Promise<T> 
 export function print_errors(error: unknown) {
   if (is_esbuild_errors(error)) {
     for (const e of error) {
-      e.location?.lineText;
       const source = kleur.bold(e.pluginName || 'esbuild');
-      const file = e.location?.file ? path.basename(e.location.file) : 'unknown file';
+      const folder = e.location?.file ? path.dirname(e.location.file) : '<unknown>';
+      const file = e.location?.file ? path.basename(e.location.file) : '<unknown>';
       const loc = kleur.bgRed(`${file}:${e.location?.line || 0}:${e.location?.column || 0}`);
       const line = e.location?.lineText ? `\n\t${kleur.gray(e.location.lineText || '')}` : '';
-      logger.error(`${source} ${loc} ${e.text}${line}`);
+      logger.error(`${source} ${folder}/${loc} ${e.text}${line}`);
     }
+    if (error.length > 1) logger.error(kleur.bold(`Total: ${error.length} errors`));
     return;
   }
   console.error(error);

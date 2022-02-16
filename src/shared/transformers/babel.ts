@@ -77,13 +77,18 @@ export function babel_transformer(input: TransformData) {
   } catch (error) {
     if (!is_babel_error(error)) throw error;
 
+    const parsed_message = error.message.match(/:\s(.*)\s\(\d+:\d+\)$/)?.[1];
+    const lineText = input.code.split('\n')[error.loc.line - 1];
+
     const formatted_error: TransformError = {
       pluginName: 'babel',
-      text: error.message as string,
+      text: parsed_message || error.message,
       location: {
         file: input.filepath,
         line: error.loc.line,
         column: error.loc.column,
+        length: lineText.length - error.loc.line,
+        lineText,
       },
     };
     throw formatted_error;
@@ -91,6 +96,7 @@ export function babel_transformer(input: TransformData) {
 }
 
 interface BabelError extends Error {
+  message: string;
   code: string; // This is an error code
   reasonCode: string;
   loc: {
@@ -101,5 +107,5 @@ interface BabelError extends Error {
 }
 
 const is_babel_error = (error: unknown): error is BabelError => {
-  return (error as BabelError).code === 'BABEL_PARSE_ERROR';
+  return (error as BabelError).code.startsWith('BABEL_');
 };

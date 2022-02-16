@@ -106,7 +106,7 @@ project.ext.react = [
 
 # Docs
 
-Only this READM for now yet, but some research is here:
+Only this README for now yet, but some research is here:
 
 - [TODO list](./notes/todo.md)
 - [HMR](./notes/hmr.md)
