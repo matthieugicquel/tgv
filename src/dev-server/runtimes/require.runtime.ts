@@ -49,8 +49,14 @@ function require_inner(identifier: string) {
   ModuleResultCache.set(identifier, _module);
 
   if (identifier.includes('node_modules/')) {
-    module_fn(_module.exports, _module);
-    return _module.exports;
+    try {
+      module_fn(_module.exports, _module);
+      return _module.exports;
+    } catch (error) {
+      // TODO: make this error visible
+      console.error('module run error', identifier, error);
+      throw error;
+    }
   }
 
   // This is app code, we want to register it with fast refresh
@@ -60,6 +66,8 @@ function require_inner(identifier: string) {
     module_fn(_module.exports, _module);
     conclude_refresh_registration(_module);
     return _module.exports;
+  } catch (error) {
+    throw error;
   } finally {
     reset_refresh_registration();
   }

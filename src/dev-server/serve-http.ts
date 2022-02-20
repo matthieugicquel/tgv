@@ -53,14 +53,21 @@ export function create_http_server(port: number) {
   });
 
   // See https://github.com/react-native-community/cli/blob/master/packages/cli-server-api/src/index.ts for what this middleware does
-  const { middleware: rn_dev_server_middleware, attachToServer } = createDevServerMiddleware({
+  const {
+    middleware: rn_dev_server_middleware,
+    websocketEndpoints,
+    debuggerProxyEndpoint,
+    messageSocketEndpoint,
+    eventsSocketEndpoint,
+  } = createDevServerMiddleware({
     port,
     watchFolders: [],
   });
   rn_dev_server_middleware.use(indexPageMiddleware);
   server.use(rn_dev_server_middleware);
 
-  attachToServer(base_server);
+  // TODO
+  // attachToServer(base_server);
 
   // server.use('/symbolicate', bodyParser.text());
   // server.post('/symbolicate', (_req, res) => {

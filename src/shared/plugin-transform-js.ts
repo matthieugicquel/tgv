@@ -1,5 +1,5 @@
 import type * as esbuild from 'esbuild';
-import { readFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 
 import { create_cached_fn } from '../utils/cached-fn.js';
 import { normalize_path } from '../utils/path.js';
@@ -41,6 +41,8 @@ const js_multitransformer_cached = create_cached_fn({
   ): Promise<esbuild.OnLoadResult | undefined> {
     const { relative_path, code_buffer, ...options } = input;
 
+    const debug = input.debugFiles?.includes(relative_path);
+
     const loader = determine_loader(relative_path, input.transformPackages.jsxInJs);
 
     let data: TransformData = {
@@ -52,13 +54,19 @@ const js_multitransformer_cached = create_cached_fn({
 
     data.required_transforms = determine_transforms(options, data);
 
+    if (debug) {
+      console.log('DEBUG FILE', relative_path, loader, data.required_transforms);
+    }
+
     // ⚠️ The babel reanimated plugin must run before the sucrase imports transform, otherwise it doesn't detect imports
     if (data.required_transforms.includes('reanimated2')) {
       data = await babel_with_pool(data);
+      if (debug) writeFile('.tgv-cache/babel.js', data.code);
     }
 
     if (data.required_transforms.includes('flow')) {
       data = sucrase_transformer(data);
+      if (debug) writeFile('.tgv-cache/sucrase.js', data.code);
     }
 
     if (
@@ -67,11 +75,8 @@ const js_multitransformer_cached = create_cached_fn({
       data.required_transforms.includes('imports')
     ) {
       data = await swc_transformer(data);
+      if (debug) writeFile('.tgv-cache/swc.js', data.code);
     }
-
-    // if (options.hmr) {
-    //   data.code = `${data.code}\nmodule.$FORCE_CJS = true;`;
-    // }
 
     let warnings: esbuild.PartialMessage[] = [];
     if (data.required_transforms.length > 0) {

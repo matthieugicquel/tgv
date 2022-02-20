@@ -33,8 +33,7 @@ export function determine_transforms(
 
   if (
     (is_app_code ||
-      input.filepath.includes('react-native-reanimated') ||
-      input.filepath.includes('react-native-redash')) &&
+      reanimated_package_RegExp(options.transformPackages.reanimated).test(input.filepath)) &&
     workletize_code_RegExp.test(input.code)
   ) {
     transforms.push('reanimated2');
@@ -70,7 +69,7 @@ export function adjust_transforms_from_file_contents(input: TransformData): Tran
   };
 }
 
-const is_esm_RegExp = /export(\s(let|const|function|class|default)|\s?(\*|\{))/; // https://regex101.com/r/qtKiHY/1
+const is_esm_RegExp = /export(\s(let|const|function|class|default|var)|\s?(\*|\{))/; // https://regex101.com/r/qtKiHY/1
 
 const workletize_code_RegExp = new RegExp(
   `("worklet"|'worklet'|useAnimatedStyle|useAnimatedProps|createAnimatedPropAdapter|useDerivedValue|useAnimatedScrollHandler|useAnimatedReaction|useWorkletCallback|createWorklet|withTiming|withSpring|withDecay|withRepeat|useAnimatedGestureHandler|useAnimatedScrollHandler)`
@@ -78,4 +77,8 @@ const workletize_code_RegExp = new RegExp(
 
 const flow_RegExp = (packages: string[]) => {
   return new RegExp(`node_modules/(${packages.join('|')})/.*(.js)$`);
+};
+
+const reanimated_package_RegExp = (packages: string[]) => {
+  return new RegExp(`node_modules/(${packages.join('|')})/`);
 };

@@ -60,8 +60,8 @@ export function babel_transformer(input: TransformData) {
       parserOpts: {
         plugins: parser_plugins,
       },
-      configFile: false,
-      babelrc: false,
+      // configFile: false,
+      // babelrc: false,
       filename: input.filepath,
       sourceType: 'unambiguous',
     });

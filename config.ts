@@ -12,6 +12,7 @@ export type TGVConfigDef = {
      * JSX in .jsx files will be handled automatically, but packages that contain JSX in .js files must be specified here
      */
     jsxInJs?: string[];
+    reanimated?: string[];
   };
   ios?: {
     /**

@@ -47,6 +47,6 @@ require('react-native/Libraries/Core/setUpPerformance');
 require('@react-native/polyfills/console');
 require('@react-native/polyfills/error-guard');
 require('@react-native/polyfills/Object.es8');
-require('react-native/Libraries/Core/setUpPerformance');
+require('react-native/Libraries/Core/InitializeCore.js');
 `;
 }

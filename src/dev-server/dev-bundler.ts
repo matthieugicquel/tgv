@@ -39,7 +39,12 @@ export function create_dev_bundler({
     treeShaking: false, // It could mess with HMR
   };
 
-  const transform_options = { jsTarget, hmr: true, transformPackages };
+  const transform_options = {
+    jsTarget,
+    hmr: true,
+    transformPackages,
+    debugFiles: [],
+  };
 
   const banner_promise = esbuild.build({
     ...base_build_options,

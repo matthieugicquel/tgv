@@ -20,6 +20,7 @@ export type TGVConfig = {
   transformPackages: {
     flow: string[];
     jsxInJs: string[];
+    reanimated: string[];
   };
 };
 
@@ -37,6 +38,10 @@ export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): T
     transformPackages: {
       flow: dedupe([...(config.transformPackages?.flow ?? []), ...transform_flow_default]),
       jsxInJs: dedupe([...(config.transformPackages?.jsxInJs ?? []), ...transform_jsx_default]),
+      reanimated: dedupe([
+        ...(config.transformPackages?.reanimated ?? []),
+        ...transform_reanimated_default,
+      ]),
     },
   };
 }
@@ -60,3 +65,5 @@ const transform_jsx_default = [
   '@react-native-community/art',
   '@react-native-community/progress-bar-android',
 ];
+
+const transform_reanimated_default = ['react-native-reanimated'];

@@ -28,6 +28,7 @@ export type TransformerOptions = {
   hmr?: boolean;
   jsTarget: JSEngine;
   transformPackages: TGVConfig['transformPackages'];
+  debugFiles?: string[];
 };
 
 /**
