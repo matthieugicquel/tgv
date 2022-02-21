@@ -1,8 +1,8 @@
 import type * as esbuild from 'esbuild';
 import { readFile } from 'fs/promises';
 import { createRequire } from 'module';
-import { dirname } from 'path';
 
+import { create_cached_fn } from '../utils/cached-fn.js';
 import { normalize_path } from '../utils/path.js';
 import { lazy } from '../utils/utils.js';
 import { swc_transformer } from './transformers/swc.js';
@@ -15,32 +15,44 @@ const svgr = lazy(() => {
   return require(module_path); // TODO: type this
 });
 
-export const svg_plugin = (js_transform_options: TransformerOptions): esbuild.Plugin => {
+const svgr_config = lazy(async () => {
+  const user_config = await svgr().resolveConfig(process.cwd());
+  const config = user_config ? { ...defaultSVGRConfig, ...user_config } : defaultSVGRConfig;
+  return config;
+});
+
+export const svg_plugin = (options: TransformerOptions): esbuild.Plugin => {
   return {
     name: 'svg',
     setup(build) {
       build.onLoad({ filter: /\.svg$/ }, async params => {
-        const user_config = await svgr().resolveConfig(dirname(params.path));
-        const config = user_config ? { ...defaultSVGRConfig, ...user_config } : defaultSVGRConfig;
-
         const relative_path = normalize_path(params.path);
-        const source = await readFile(relative_path, 'utf8');
+        const code_buffer = await readFile(relative_path);
 
-        const js = await svgr().transform(source, config);
-
-        // TODO
-        const transformed = await swc_transformer({
-          code: js,
-          filepath: relative_path,
-          loader: 'jsx',
-          required_transforms: ['imports', 'es5-for-hermes'],
-        });
-
-        return { contents: transformed.code, loader: 'js' };
+        return svg_transformer_cached({ relative_path, code_buffer, ...options });
       });
     },
   };
 };
+
+const svg_transformer_cached = create_cached_fn({
+  cache_name: 'transform-cache-svg',
+  id_keys: ['relative_path', 'hmr', 'jsTarget'],
+  fn: async function transform_svg(
+    input: TransformerOptions & { relative_path: string; code_buffer: Buffer }
+  ): Promise<esbuild.OnLoadResult | undefined> {
+    const js = await svgr().transform(input.code_buffer.toString(), await svgr_config());
+
+    const transformed = await swc_transformer({
+      code: js,
+      filepath: input.relative_path,
+      loader: 'jsx',
+      required_transforms: ['imports', 'es5-for-hermes'],
+    });
+
+    return { contents: transformed.code, loader: 'js' };
+  },
+});
 
 const defaultSVGRConfig = {
   native: true,

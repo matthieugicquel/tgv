@@ -12,8 +12,8 @@
     "build": "./scripts/build.sh"
   },
   "bin": {
-    "tgv": "./bin/tgv-start",
-    "tgv-bundle": "./bin/tgv-bundle"
+    "tgv": "./bin/tgv-start.js",
+    "tgv-bundle": "./bin/tgv-bundle.js"
   },
   "dependencies": {
     "@babel/runtime": "^7.17.2",

@@ -1,10 +1,10 @@
-import { logger } from '@react-native-community/cli-tools';
 import type * as esbuild from 'esbuild';
 import { copyFile, mkdir, readdir, readFile } from 'fs/promises';
 import image_size from 'image-size';
 import * as path from 'path';
 
 import { create_cached_fn } from '../utils/cached-fn.js';
+import logger from '../utils/logger.js';
 import { normalize_path } from '../utils/path.js';
 import { select } from '../utils/utils.js';
 import getAssetDestPathAndroid from './assets/getAssetsDestPathAndroid.js';

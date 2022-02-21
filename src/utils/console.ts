@@ -1,9 +1,10 @@
-import { logger } from '@react-native-community/cli-tools';
 import type * as esbuild from 'esbuild';
 import kleur from 'kleur';
 import ora from 'ora';
 import path from 'path';
 import { performance } from 'perf_hooks';
+
+import logger from './logger.js';
 
 /**
  * Show a spinner while waiting for a promise to resolve

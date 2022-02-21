@@ -1,11 +1,14 @@
-import isEqualDeep from 'fast-deep-equal';
 import { readFileSync, writeFileSync } from 'fs';
 import * as path from 'path';
 import { deserialize, serialize } from 'v8';
 
+import isEqualDeep from '../utils/fast-deep-equal.js';
 import { maybe } from './utils.js';
 
-type CachedFnConfig<Input, Output> = {
+type InputValue = string | Buffer | boolean | Array<InputValue>;
+type ValidInput = Record<string, InputValue | Record<string, InputValue>>;
+
+type CachedFnConfig<Input extends ValidInput, Output> = {
   cache_name: string;
   /**
    * There can only be one cache entry per key even if the hash is different. This helps manage cache size
@@ -14,7 +17,9 @@ type CachedFnConfig<Input, Output> = {
   fn: (input: Input) => Output | Promise<Output>;
 };
 
-export function create_cached_fn<Input, Output>(config: CachedFnConfig<Input, Output>) {
+function create_cached_fn_active<Input extends ValidInput, Output>(
+  config: CachedFnConfig<Input, Output>
+) {
   const { cache_name, id_keys, fn } = config;
 
   const cache_path = path.join(process.cwd(), `.tgv-cache/${cache_name}`);
@@ -61,5 +66,15 @@ export function create_cached_fn<Input, Output>(config: CachedFnConfig<Input, Ou
     return result;
   };
 }
+
+function create_cached_fn_inactive<Input extends ValidInput, Output>(
+  config: CachedFnConfig<Input, Output>
+) {
+  return config.fn;
+}
+
+export const create_cached_fn = process.env.NO_CACHE
+  ? create_cached_fn_inactive
+  : create_cached_fn_active;
 
 type TCache<Input, Output> = Map<string, { input: Input; result: Output }>;

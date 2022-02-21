@@ -6,7 +6,7 @@
 - [x] RN CLI plugin for bundling
 - [x] Prod-compatible assets handling
 - [ ] Clarify which Android/iOS/Hermes/React Native versions are supported
-- [ ] Reanimated 2 (working with small patch)
+- [x] Reanimated 2 (working with small patch)
 
 ### Error handling
 

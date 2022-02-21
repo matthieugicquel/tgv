@@ -1,4 +1,3 @@
-import { logger } from '@react-native-community/cli-tools';
 import crypto from 'crypto';
 import * as fs from 'fs';
 import { writeFile } from 'fs/promises';
@@ -10,6 +9,7 @@ import { create_hmr_wss } from './dev-server/serve-hmr-socket.js';
 import { create_http_server } from './dev-server/serve-http.js';
 import { compute_config } from './shared/config.js';
 import { print_errors, spin } from './utils/console.js';
+import logger from './utils/logger.js';
 import { time } from './utils/utils.js';
 
 export async function tgv_start(config_def: TGVConfigDef) {

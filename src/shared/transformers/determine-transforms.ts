@@ -1,6 +1,14 @@
 import { without } from 'lodash-es';
 
-import type { RequiredTransform, TransformData, TransformerOptions } from './types';
+import type { Loader, RequiredTransform, TransformData, TransformerOptions } from './types';
+
+export function determine_loader(path: string, transformPackages: string[]): Loader {
+  if (path.endsWith('.ts')) return 'ts';
+  if (path.endsWith('.tsx')) return 'tsx';
+  if (path.endsWith('.jsx')) return 'jsx';
+  if (is_in_matching_package(transformPackages, path)) return 'jsx';
+  return 'js';
+}
 
 export function determine_transforms(
   options: TransformerOptions,
@@ -21,7 +29,7 @@ export function determine_transforms(
   // esbuild doesn't transform flow
   if (
     (input.loader === 'jsx' || input.loader === 'js') &&
-    flow_RegExp(options.transformPackages.flow).test(input.filepath)
+    is_in_matching_package(options.transformPackages.flow, input.filepath)
   ) {
     transforms.push('flow');
   }
@@ -32,8 +40,7 @@ export function determine_transforms(
   }
 
   if (
-    (is_app_code ||
-      reanimated_package_RegExp(options.transformPackages.reanimated).test(input.filepath)) &&
+    (is_app_code || is_in_matching_package(options.transformPackages.reanimated, input.filepath)) &&
     workletize_code_RegExp.test(input.code)
   ) {
     transforms.push('reanimated2');
@@ -75,10 +82,6 @@ const workletize_code_RegExp = new RegExp(
   `("worklet"|'worklet'|useAnimatedStyle|useAnimatedProps|createAnimatedPropAdapter|useDerivedValue|useAnimatedScrollHandler|useAnimatedReaction|useWorkletCallback|createWorklet|withTiming|withSpring|withDecay|withRepeat|useAnimatedGestureHandler|useAnimatedScrollHandler)`
 );
 
-const flow_RegExp = (packages: string[]) => {
-  return new RegExp(`node_modules/(${packages.join('|')})/.*(.js)$`);
-};
-
-const reanimated_package_RegExp = (packages: string[]) => {
-  return new RegExp(`node_modules/(${packages.join('|')})/`);
+const is_in_matching_package = (packages: string[], identifier: string) => {
+  return packages.some(package_name => identifier.includes(`node_modules/${package_name}/`));
 };

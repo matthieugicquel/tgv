@@ -4,10 +4,10 @@ import { readFile, writeFile } from 'fs/promises';
 import { create_cached_fn } from '../utils/cached-fn.js';
 import { normalize_path } from '../utils/path.js';
 import { babel_with_pool } from './babel-with-pool.js';
-import { determine_transforms } from './transformers/determine-transforms.js';
+import { determine_loader, determine_transforms } from './transformers/determine-transforms.js';
 import { sucrase_transformer } from './transformers/sucrase.js';
 import { swc_transformer } from './transformers/swc.js';
-import { Loader, TransformData, TransformerOptions } from './transformers/types.js';
+import { TransformData, TransformerOptions } from './transformers/types.js';
 
 export const transform_js_plugin = (options: TransformerOptions): esbuild.Plugin => {
   return {
@@ -34,9 +34,9 @@ export const create_js_multitransformer = (options: TransformerOptions) => {
 };
 
 const js_multitransformer_cached = create_cached_fn({
-  cache_name: 'transform-cache',
+  cache_name: 'transform-cache-js',
   id_keys: ['relative_path', 'hmr', 'jsTarget'],
-  fn: async function transform(
+  fn: async function transform_js(
     input: TransformerOptions & { relative_path: string; code_buffer: Buffer }
   ): Promise<esbuild.OnLoadResult | undefined> {
     const { relative_path, code_buffer, ...options } = input;
@@ -94,16 +94,4 @@ const js_multitransformer_cached = create_cached_fn({
 
 const is_transform_error = (error: unknown): error is esbuild.PartialMessage => {
   return 'location' in (error as esbuild.PartialMessage);
-};
-
-function determine_loader(path: string, transformPackages: string[]): Loader {
-  if (path.endsWith('.ts')) return 'ts';
-  if (path.endsWith('.tsx')) return 'tsx';
-  if (path.endsWith('.jsx')) return 'jsx';
-  if (jsx_in_js_RegExp(transformPackages).test(path)) return 'jsx';
-  return 'js';
-}
-
-const jsx_in_js_RegExp = (packages: string[]) => {
-  return new RegExp(`node_modules/(${packages.join('|')})/.*(.js)$`);
 };

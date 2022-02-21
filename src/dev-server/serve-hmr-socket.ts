@@ -1,6 +1,6 @@
-import { logger } from '@react-native-community/cli-tools';
 import WebSocket, { WebSocketServer } from 'ws';
 
+import logger from '../utils/logger.js';
 import type { ServerMessage } from './ws-types';
 
 type Params = {

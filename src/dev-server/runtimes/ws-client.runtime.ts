@@ -4,8 +4,8 @@
  */
 
 // @ts-expect-error
-// @ts-expect-error
 import LogBox from 'react-native/Libraries/LogBox/LogBox';
+// @ts-expect-error
 import DevSettings from 'react-native/Libraries/Utilities/DevSettings';
 
 import type { ServerMessage } from '../ws-types';
@@ -72,15 +72,20 @@ let abort = new AbortController();
 
 async function try_reconnecting() {
   setInterval(async () => {
-    abort.abort();
-    abort = new AbortController();
+    try {
+      abort.abort();
+      abort = new AbortController();
 
-    const response = await fetch(globalThis.$TGV_SOCKET_URL.replace('ws', 'http'), {
-      signal: abort.signal,
-    });
+      const response = await fetch(globalThis.$TGV_SOCKET_URL.replace('ws', 'http'), {
+        signal: abort.signal,
+      });
 
-    if (response.status === 205) {
-      DevSettings.reload('Reconnecting after server came back online');
+      if (response.status === 205) {
+        DevSettings.reload('Reconnecting after server came back online');
+      }
+    } catch (error) {
+      // We don't care
+      console.log(error);
     }
   }, 1000);
 }
