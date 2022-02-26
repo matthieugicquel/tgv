@@ -88,9 +88,9 @@ yarn react-native run-(ios|android)
 
 ### 🍏 iOS
 
-Add `export BUNDLE_COMMAND=bundle-tgv` to the "Bundle react native code and images" script in Xcode for the app target:
+Add `export BUNDLE_COMMAND=tgv-bundle` to the "Bundle react native code and images" script in Xcode for the app target:
 
-<img width="1397" alt="Add an export BUNDLE_COMMAND=bundle-tgv line to the bundle react native code and images script in Xcode" src="https://user-images.githubusercontent.com/10573690/145253632-f31d50e8-deab-4860-8f6c-4ce9503d8521.png">
+<img width="1397" alt="Add an export BUNDLE_COMMAND=tgv-bundle line to the bundle react native code and images script in Xcode" src="https://user-images.githubusercontent.com/10573690/145253632-f31d50e8-deab-4860-8f6c-4ce9503d8521.png">
 
 
 ### 🤖 Android
@@ -100,7 +100,7 @@ Add `export BUNDLE_COMMAND=bundle-tgv` to the "Bundle react native code and imag
 
 project.ext.react = [
     // ...
-    bundleCommand: 'bundle-tgv'
+    bundleCommand: 'tgv-bundle'
 ]
 ```
 

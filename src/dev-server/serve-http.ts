@@ -4,7 +4,9 @@ import {
 } from '@react-native-community/cli-server-api';
 import * as fs from 'fs';
 import http from 'http';
+import mime from 'mime-types';
 import type { Socket } from 'net';
+import { basename } from 'path';
 import polka from 'polka';
 import type { WebSocketServer } from 'ws';
 
@@ -79,10 +81,9 @@ export function create_http_server(port: number) {
 
   server.get('/assets/*', (req, res) => {
     const fs_path = req.path.replace('/assets/', '');
-    const extension = req.path.split('.').pop()?.toLowerCase();
 
     logger.debug(`🖼  Serving asset ${fs_path}`);
-    res.writeHead(200, { 'Content-type': `image/${extension}` });
+    res.writeHead(200, { 'Content-type': mime.lookup(basename(fs_path)) || '' });
     fs.createReadStream(fs_path).pipe(res);
   });
 

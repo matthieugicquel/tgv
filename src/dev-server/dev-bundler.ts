@@ -83,7 +83,7 @@ export function create_dev_bundler({
         const code_stream = new PassThrough();
         code_stream.pipe(res_stream);
 
-        if (true) {
+        if (process.env.DEBUG) {
           const save_stream = fs.createWriteStream('.tgv-cache/latest-bundle.js');
           code_stream.pipe(save_stream);
         }

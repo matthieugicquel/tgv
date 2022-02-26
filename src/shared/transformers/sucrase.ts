@@ -35,6 +35,7 @@ export function sucrase_transformer(input: TransformData): TransformData {
     const transformed = sucrase.transform(input.code, {
       transforms,
       filePath: input.filepath,
+      // disableESTransforms: true, // this should be handled by the rest of the chain, but for now some things break without it
       // production: TODO
     });
     return {

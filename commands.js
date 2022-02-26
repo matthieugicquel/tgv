@@ -58,6 +58,10 @@ const bundle_args = [
     description: 'unsuppported',
   },
   {
+    name: '--minify [boolean]',
+    description: 'unsuppported',
+  },
+  {
     name: '--reset-cache [boolean]',
     description: 'unsuppported',
   },

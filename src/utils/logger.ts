@@ -2,7 +2,7 @@ import chalk from 'chalk';
 
 const SEPARATOR = ', ';
 
-let verbose = false;
+let verbose = process.env.DEBUG ? true : false;
 let disabled = false;
 
 const formatMessages = (messages: Array<string>) => chalk.reset(messages.join(SEPARATOR));
