@@ -63,7 +63,6 @@ const tgvConfig = {
   },
   transformPackages: {
     flow: [],
-    jsxInJs: [],
   }
 };
 

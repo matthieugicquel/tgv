@@ -43,7 +43,7 @@ const js_multitransformer_cached = create_cached_fn({
 
     const debug = input.debugFiles?.includes(relative_path);
 
-    const loader = determine_loader(relative_path, input.transformPackages.jsxInJs);
+    const loader = determine_loader(relative_path);
 
     let data: TransformData = {
       code: code_buffer.toString(),

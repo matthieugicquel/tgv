@@ -1,3 +1,5 @@
+import type { TGVPlugin } from './src/plugins/types';
+
 export type TGVConfigDef = {
   entryFile?: string;
   serverPort?: number;
@@ -8,10 +10,6 @@ export type TGVConfigDef = {
    */
   transformPackages?: {
     flow?: string[];
-    /**
-     * JSX in .jsx files will be handled automatically, but packages that contain JSX in .js files must be specified here
-     */
-    jsxInJs?: string[];
     reanimated?: string[];
   };
   ios?: {
@@ -26,4 +24,5 @@ export type TGVConfigDef = {
      */
     jsTarget?: 'jsc' | 'hermes';
   };
+  plugins: TGVPlugin[];
 };

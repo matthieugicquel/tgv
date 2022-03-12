@@ -2,12 +2,10 @@ import { without } from 'lodash-es';
 
 import type { Loader, RequiredTransform, TransformData, TransformerOptions } from './types';
 
-export function determine_loader(path: string, transformPackages: string[]): Loader {
+export function determine_loader(path: string): Loader {
   if (path.endsWith('.ts')) return 'ts';
   if (path.endsWith('.tsx')) return 'tsx';
-  if (path.endsWith('.jsx')) return 'jsx';
-  if (is_in_matching_package(transformPackages, path)) return 'jsx';
-  return 'js';
+  return 'jsx';
 }
 
 export function determine_transforms(

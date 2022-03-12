@@ -21,7 +21,6 @@ export type TGVConfig = {
   jsTarget: JSEngine;
   transformPackages: {
     flow: string[];
-    jsxInJs: string[];
     reanimated: string[];
   };
 };
@@ -39,7 +38,6 @@ export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): T
     jsTarget: config[platform]?.jsTarget ?? 'jsc',
     transformPackages: {
       flow: dedupe([...(config.transformPackages?.flow ?? []), ...transform_flow_default]),
-      jsxInJs: dedupe([...(config.transformPackages?.jsxInJs ?? []), ...transform_jsx_default]),
       reanimated: dedupe([
         ...(config.transformPackages?.reanimated ?? []),
         ...transform_reanimated_default,
@@ -54,16 +52,6 @@ const transform_flow_default = [
   'react-native-screens',
   'react-native-gesture-handler',
   '@react-native-async-storage/async-storage',
-  '@react-native-community/art',
-  '@react-native-community/progress-bar-android',
-];
-
-const transform_jsx_default = [
-  'react-native',
-  '@react-native',
-  'react-native-reanimated',
-  'react-native-screens',
-  'react-native-gesture-handler',
   '@react-native-community/art',
   '@react-native-community/progress-bar-android',
 ];
