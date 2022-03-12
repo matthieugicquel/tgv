@@ -35,7 +35,7 @@ export const create_js_multitransformer = (options: TransformerOptions) => {
 
 const js_multitransformer_cached = create_cached_fn({
   cache_name: 'transform-cache-js',
-  id_keys: ['relative_path', 'hmr', 'jsTarget'],
+  id_keys: ['relative_path', 'hmr'],
   fn: async function transform_js(
     input: TransformerOptions & { relative_path: string; code_buffer: Buffer }
   ): Promise<esbuild.OnLoadResult | undefined> {

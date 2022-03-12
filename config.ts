@@ -12,17 +12,5 @@ export type TGVConfigDef = {
     flow?: string[];
     reanimated?: string[];
   };
-  ios?: {
-    /**
-     * TGV needs to know which JS engine is used because it will try to produce an optimized bundle with modern JS if it's supported
-     */
-    jsTarget?: 'jsc' | 'hermes';
-  };
-  android?: {
-    /**
-     * TGV needs to know which JS engine is used because it will try to produce an optimized bundle with modern JS if it's supported
-     */
-    jsTarget?: 'jsc' | 'hermes';
-  };
   plugins: TGVPlugin[];
 };

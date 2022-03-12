@@ -6,6 +6,7 @@ import { PassThrough, Transform, Writable } from 'stream';
 
 import { TGVConfig } from '../../config.js';
 import { compute_esbuild_options } from '../../shared/esbuild-options.js';
+import { TransformerOptions } from '../../shared/js-transformers/types.js';
 import { assets_plugin } from '../../shared/plugin-assets.js';
 import { entry_point_plugin } from '../../shared/plugin-entrypoint.js';
 import { transform_js_plugin } from '../../shared/plugin-transform-js.js';
@@ -14,33 +15,23 @@ import { module_dirname } from '../../utils/path.js';
 import { hot_module_plugin } from './plugin-hot-module.js';
 import { inject_runtime_plugin } from './plugin-inject-runtime.js';
 
-export type DevBundlerParams = Pick<
-  TGVConfig,
-  'entryFile' | 'platform' | 'jsTarget' | 'transformPackages'
->;
+export type DevBundlerParams = Pick<TGVConfig, 'entryFile' | 'platform' | 'transformPackages'>;
 
 export type DevBundler = ReturnType<typeof create_dev_bundler>;
 
-export function create_dev_bundler({
-  entryFile,
-  platform,
-  jsTarget,
-  transformPackages,
-}: DevBundlerParams) {
+export function create_dev_bundler({ entryFile, platform, transformPackages }: DevBundlerParams) {
   const base_build_options = {
     ...compute_esbuild_options({
       platform,
-      jsTarget,
       define: {
         __DEV__: 'true',
       },
     }),
-    outdir: `.tgv-cache/${platform}-${jsTarget}`,
+    outdir: `.tgv-cache/${platform}`,
     treeShaking: false, // It could mess with HMR
   };
 
-  const transform_options = {
-    jsTarget,
+  const transform_options: TransformerOptions = {
     hmr: true,
     transformPackages,
     debugFiles: [],

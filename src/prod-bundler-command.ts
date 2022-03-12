@@ -13,10 +13,9 @@ export async function tgv_bundle(args: BundleCLIArgs, config_def: TGVConfigDef) 
 
   try {
     await spin(
-      `📦 Bundling ${config.entryFile} for ${config.platform} (${config.jsTarget})`,
+      `📦 Bundling ${config.entryFile} for ${config.platform}`,
       bundle_for_production({
         platform: config.platform,
-        jsTarget: config.jsTarget,
         entryPoint: config.entryFile,
         outfile: args.bundleOutput,
         assets_dest: args.assetsDest,

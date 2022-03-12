@@ -37,7 +37,7 @@ export const svg_plugin = (options: TransformerOptions): esbuild.Plugin => {
 
 const svg_transformer_cached = create_cached_fn({
   cache_name: 'transform-cache-svg',
-  id_keys: ['relative_path', 'hmr', 'jsTarget'],
+  id_keys: ['relative_path', 'hmr'],
   fn: async function transform_svg(
     input: TransformerOptions & { relative_path: string; code_buffer: Buffer }
   ): Promise<esbuild.OnLoadResult | undefined> {

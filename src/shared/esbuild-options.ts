@@ -1,24 +1,22 @@
 import type * as esbuild from 'esbuild';
 
-import { JSEngine, SupportedPlatform } from '../utils/platform.js';
-import { select } from '../utils/utils.js';
+import { SupportedPlatform } from '../utils/platform.js';
 
 type Customizations = {
   platform: SupportedPlatform;
-  jsTarget: JSEngine;
   define?: esbuild.BuildOptions['define'];
 };
 
 type BuildOptions = esbuild.BuildOptions & { write: false; metafile: true };
 
 export function compute_esbuild_options(options: Customizations): BuildOptions {
-  const { define = {}, platform, jsTarget } = options;
+  const { define = {}, platform } = options;
 
   return {
     bundle: true,
     write: false,
     // For the ES5 target to work with esbuild, many features like let/const, destructuring must have been pre-transpiled. This is done by SWC
-    target: select(jsTarget, { hermes: 'es5', jsc: 'safari11' }),
+    target: 'es5',
     format: 'iife',
     charset: 'utf8',
     sourcemap: 'external',

@@ -33,9 +33,7 @@ export function determine_transforms(
   }
 
   // hermes doesn't fully support classes, esbuild doesn't transform them.
-  if (options.jsTarget === 'hermes') {
-    transforms.push('es5-for-hermes');
-  }
+  transforms.push('es5-for-hermes');
 
   if (
     (is_app_code || is_in_matching_package(options.transformPackages.reanimated, input.filepath)) &&

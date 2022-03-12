@@ -1,7 +1,7 @@
 import { TGVConfigDef } from '../config.js';
 import { tgv_plugin_flow } from './plugins/flow/flow.js';
 import { tgv_plugin_reanimated } from './plugins/reanimated/reanimated.js';
-import { assert_supported_platform, JSEngine, SupportedPlatform } from './utils/platform.js';
+import { assert_supported_platform, SupportedPlatform } from './utils/platform.js';
 import { dedupe } from './utils/utils.js';
 
 // keep in sync with commands.js
@@ -18,7 +18,6 @@ export type TGVConfig = {
   bundleOutput: string;
   assetsDest: string | undefined;
   serverPort: number;
-  jsTarget: JSEngine;
   transformPackages: {
     flow: string[];
     reanimated: string[];
@@ -35,7 +34,6 @@ export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): T
     bundleOutput: cli_args.bundleOutput || '.tgv-cache/index.js',
     assetsDest: cli_args.assetsDest,
     serverPort: config.serverPort || 8081,
-    jsTarget: config[platform]?.jsTarget ?? 'jsc',
     transformPackages: {
       flow: dedupe([...(config.transformPackages?.flow ?? []), ...transform_flow_default]),
       reanimated: dedupe([

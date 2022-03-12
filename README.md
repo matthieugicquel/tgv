@@ -55,12 +55,6 @@ Then add to react-native.config.js: (or create it)
  * @type {import('tgv/config').TGVConfigDef}
  */
 const tgvConfig = {
-  ios: {
-    jsTarget: 'jsc', // or hermes
-  },
-  android: {
-    jsTarget: 'hermes', // or jsc
-  },
   transformPackages: {
     flow: [],
   }
