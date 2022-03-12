@@ -7,7 +7,7 @@ import { create_cached_fn } from '../utils/cached-fn.js';
 import logger from '../utils/logger.js';
 import { normalize_path } from '../utils/path.js';
 import { select } from '../utils/utils.js';
-import getAssetDestPathAndroid from './assets/getAssetsDestPathAndroid.js';
+import getAssetDestPathAndroid from './assets-helpers/getAssetsDestPathAndroid.js';
 
 const image_extensions = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'psd', 'tiff'];
 

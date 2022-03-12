@@ -5,8 +5,8 @@ import { createRequire } from 'module';
 import { create_cached_fn } from '../utils/cached-fn.js';
 import { normalize_path } from '../utils/path.js';
 import { lazy } from '../utils/utils.js';
-import { swc_transformer } from './transformers/swc.js';
-import { TransformerOptions } from './transformers/types.js';
+import { swc_transformer } from './js-transformers/swc.js';
+import { TransformerOptions } from './js-transformers/types.js';
 
 const require = createRequire(import.meta.url);
 

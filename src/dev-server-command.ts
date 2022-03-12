@@ -3,12 +3,16 @@ import * as fs from 'fs';
 import { writeFile } from 'fs/promises';
 
 import type { TGVConfigDef } from '../config.js';
-import { create_dev_bundler, DevBundler, DevBundlerParams } from './dev-server/dev-bundler.js';
-import { watch_fs } from './dev-server/fs-watcher.js';
-import { create_hmr_wss } from './dev-server/serve-hmr-socket.js';
-import { create_http_server } from './dev-server/serve-http.js';
+import {
+  create_dev_bundler,
+  DevBundler,
+  DevBundlerParams,
+} from './dev-server/bundler/dev-bundler.js';
+import { create_hmr_wss } from './dev-server/server/hmr-wss.js';
+import { create_http_server } from './dev-server/server/http-server.js';
 import { compute_config } from './shared/config.js';
 import { print_errors, spin } from './utils/console.js';
+import { watch_fs } from './utils/fs-watcher.js';
 import logger from './utils/logger.js';
 import { time } from './utils/utils.js';
 

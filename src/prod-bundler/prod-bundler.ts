@@ -17,7 +17,7 @@ type Params = {
   transformPackages: TGVConfig['transformPackages'];
 };
 
-export async function bundle(params: Params): Promise<void> {
+export async function bundle_for_production(params: Params): Promise<void> {
   const { entryPoint, platform, jsTarget, outfile, assets_dest, transformPackages } = params;
 
   try {

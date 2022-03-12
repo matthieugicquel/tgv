@@ -3,11 +3,11 @@ import { readFile, writeFile } from 'fs/promises';
 
 import { create_cached_fn } from '../utils/cached-fn.js';
 import { normalize_path } from '../utils/path.js';
-import { babel_with_pool } from './babel-with-pool.js';
-import { determine_loader, determine_transforms } from './transformers/determine-transforms.js';
-import { sucrase_transformer } from './transformers/sucrase.js';
-import { swc_transformer } from './transformers/swc.js';
-import { TransformData, TransformerOptions } from './transformers/types.js';
+import { babel_with_pool } from './js-transformers/babel.pool.js';
+import { determine_loader, determine_transforms } from './js-transformers/determine-transforms.js';
+import { sucrase_transformer } from './js-transformers/sucrase.js';
+import { swc_transformer } from './js-transformers/swc.js';
+import { TransformData, TransformerOptions } from './js-transformers/types.js';
 
 export const transform_js_plugin = (options: TransformerOptions): esbuild.Plugin => {
   return {

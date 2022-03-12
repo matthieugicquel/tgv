@@ -10,7 +10,7 @@ import { basename } from 'path';
 import polka from 'polka';
 import type { WebSocketServer } from 'ws';
 
-import logger from '../utils/logger.js';
+import logger from '../../utils/logger.js';
 
 const already_logged_missing_handlers = new Set<string>();
 

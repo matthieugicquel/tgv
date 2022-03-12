@@ -1,7 +1,7 @@
 import WebSocket, { WebSocketServer } from 'ws';
 
-import logger from '../utils/logger.js';
-import type { ServerMessage } from './ws-types';
+import logger from '../../utils/logger.js';
+import type { ServerMessage } from '../ws-types';
 
 type Params = {
   port: number;

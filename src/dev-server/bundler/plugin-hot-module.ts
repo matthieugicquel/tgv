@@ -1,8 +1,8 @@
 import type * as esbuild from 'esbuild';
 
-import { create_js_multitransformer } from '../shared/plugin-transform-js.js';
-import { TransformerOptions } from '../shared/transformers/types.js';
-import { normalize_path } from '../utils/path.js';
+import { TransformerOptions } from '../../shared/js-transformers/types.js';
+import { create_js_multitransformer } from '../../shared/plugin-transform-js.js';
+import { normalize_path } from '../../utils/path.js';
 
 export const hot_module_plugin = (
   client_cached_modules: Set<string>,

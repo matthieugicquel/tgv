@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync } from 'fs';
 
 import type { TGVConfigDef } from '../config.js';
-import { bundle } from './prod-bundler/bundle-with-esbuild.js';
-import { destroy_worker_pool } from './shared/babel-with-pool.js';
+import { bundle_for_production } from './prod-bundler/prod-bundler.js';
 import { BundleCLIArgs, compute_config } from './shared/config.js';
+import { destroy_worker_pool } from './shared/js-transformers/babel.pool.js';
 import { print_errors, spin } from './utils/console.js';
 
 export async function tgv_bundle(args: BundleCLIArgs, config_def: TGVConfigDef) {
@@ -13,8 +13,8 @@ export async function tgv_bundle(args: BundleCLIArgs, config_def: TGVConfigDef) 
 
   try {
     await spin(
-      `📦 Bundling ${args.entryFile} for ${args.platform} (${config.jsTarget})`,
-      bundle({
+      `📦 Bundling ${config.entryFile} for ${config.platform} (${config.jsTarget})`,
+      bundle_for_production({
         platform: config.platform,
         jsTarget: config.jsTarget,
         entryPoint: config.entryFile,

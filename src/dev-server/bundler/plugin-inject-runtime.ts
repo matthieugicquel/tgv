@@ -2,8 +2,8 @@ import type * as esbuild from 'esbuild';
 import { readFile } from 'fs/promises';
 import * as path from 'path';
 
-import { swc_transformer } from '../shared/transformers/swc.js';
-import { module_dirname } from '../utils/path.js';
+import { swc_transformer } from '../../shared/js-transformers/swc.js';
+import { module_dirname } from '../../utils/path.js';
 
 /**
  * Replace the refresh setup included in react-native with ours
@@ -18,7 +18,7 @@ export const inject_runtime_plugin = (): esbuild.Plugin => {
       // TODO: better RegExp
       build.onLoad({ filter: new RegExp('setUpReactRefresh') }, async () => {
         // We don't use an onResolve callback because we want this file to be in the context of the files it replaces when it comes to resolving
-        const filepath = path.join(module_dirname(import.meta), 'runtimes/ws-client.runtime.js');
+        const filepath = path.join(module_dirname(import.meta), '../runtimes/ws-client.runtime.js');
         const original = await readFile(filepath, 'utf8');
         const transformed = await swc_transformer({
           code: original,

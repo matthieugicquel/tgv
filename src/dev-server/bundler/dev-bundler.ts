@@ -4,13 +4,13 @@ import keys from 'lodash-es/keys.js';
 import * as path from 'path';
 import { PassThrough, Transform, Writable } from 'stream';
 
-import { TGVConfig } from '../shared/config.js';
-import { compute_esbuild_options } from '../shared/esbuild-options.js';
-import { assets_plugin } from '../shared/plugin-assets.js';
-import { entry_point_plugin } from '../shared/plugin-entrypoint.js';
-import { transform_js_plugin } from '../shared/plugin-transform-js.js';
-import { svg_plugin } from '../shared/plugin-transform-svg.js';
-import { module_dirname } from '../utils/path.js';
+import { TGVConfig } from '../../shared/config.js';
+import { compute_esbuild_options } from '../../shared/esbuild-options.js';
+import { assets_plugin } from '../../shared/plugin-assets.js';
+import { entry_point_plugin } from '../../shared/plugin-entrypoint.js';
+import { transform_js_plugin } from '../../shared/plugin-transform-js.js';
+import { svg_plugin } from '../../shared/plugin-transform-svg.js';
+import { module_dirname } from '../../utils/path.js';
 import { hot_module_plugin } from './plugin-hot-module.js';
 import { inject_runtime_plugin } from './plugin-inject-runtime.js';
 
@@ -48,7 +48,7 @@ export function create_dev_bundler({
 
   const banner_promise = esbuild.build({
     ...base_build_options,
-    entryPoints: [path.join(module_dirname(import.meta), 'runtimes/require.runtime.js')],
+    entryPoints: [path.join(module_dirname(import.meta), '../runtimes/require.runtime.js')],
     nodePaths: [path.join(process.cwd(), 'node_modules')], // To resolve react-refresh to the locally installed package
     plugins: [transform_js_plugin({ ...transform_options, hmr: false })],
   });
