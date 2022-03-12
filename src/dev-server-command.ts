@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { writeFile } from 'fs/promises';
 
 import type { TGVConfigDef } from '../config.js';
+import { compute_config } from './config.js';
 import {
   create_dev_bundler,
   DevBundler,
@@ -10,7 +11,6 @@ import {
 } from './dev-server/bundler/dev-bundler.js';
 import { create_hmr_wss } from './dev-server/server/hmr-wss.js';
 import { create_http_server } from './dev-server/server/http-server.js';
-import { compute_config } from './shared/config.js';
 import { print_errors, spin } from './utils/console.js';
 import { watch_fs } from './utils/fs-watcher.js';
 import logger from './utils/logger.js';

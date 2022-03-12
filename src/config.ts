@@ -1,6 +1,8 @@
-import { TGVConfigDef } from '../../config.js';
-import { assert_supported_platform, JSEngine, SupportedPlatform } from '../utils/platform.js';
-import { dedupe } from '../utils/utils.js';
+import { TGVConfigDef } from '../config.js';
+import { tgv_plugin_flow } from './plugins/flow/flow.js';
+import { tgv_plugin_reanimated } from './plugins/reanimated/reanimated.js';
+import { assert_supported_platform, JSEngine, SupportedPlatform } from './utils/platform.js';
+import { dedupe } from './utils/utils.js';
 
 // keep in sync with commands.js
 export type BundleCLIArgs = {
@@ -67,3 +69,10 @@ const transform_jsx_default = [
 ];
 
 const transform_reanimated_default = ['react-native-reanimated'];
+
+export const default_config: TGVConfigDef = {
+  plugins: [
+    tgv_plugin_flow({ packages: transform_flow_default }),
+    tgv_plugin_reanimated({ packages: transform_reanimated_default }),
+  ],
+};

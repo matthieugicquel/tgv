@@ -1,7 +1,7 @@
 import type * as esbuild from 'esbuild';
 
+import { TGVConfig } from '../../config.js';
 import type { JSEngine } from '../../utils/platform.js';
-import { TGVConfig } from '../config.js';
 
 export type TransformerFactory = (options: TransformerOptions) => Transformer;
 

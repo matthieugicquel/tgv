@@ -1,6 +1,6 @@
 import * as esbuild from 'esbuild';
 
-import { TGVConfig } from '../shared/config.js';
+import { TGVConfig } from '../config.js';
 import { compute_esbuild_options } from '../shared/esbuild-options.js';
 import { assets_plugin } from '../shared/plugin-assets.js';
 import { entry_point_plugin } from '../shared/plugin-entrypoint.js';
