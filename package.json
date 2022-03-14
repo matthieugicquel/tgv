@@ -15,6 +15,12 @@
     "tgv": "./bin/tgv-start.js",
     "tgv-bundle": "./bin/tgv-bundle.js"
   },
+  "exports": {
+    "./commands": "./dist/commands.cjs",
+    "./plugins/flow": "./dist/plugins/flow/flow.js",
+    "./plugins/reanimated": "./dist/plugins/reanimated/reanimated.js",
+    "./plugins/svg": "./dist/plugins/svg/svg.js"
+  },
   "dependencies": {
     "@babel/runtime": "^7.17.2",
     "@parcel/watcher": "^2.0.5",

@@ -50,19 +50,19 @@ yarn
 Then add to react-native.config.js: (or create it)
 
 ```js
-/**
- * See type definition for full config options
- * @type {import('tgv/config').TGVConfigDef}
- */
-const tgvConfig = {
-};
-
 module.exports = {
-  commands: require('tgv/commands')(tgvConfig),
-  // other react-native config options
-};
+  commands: require('tgv/commands')({
+    async plugins() {
+      const {flow} = await import('tgv/plugins/flow');
+      const {reanimated} = await import('tgv/plugins/reanimated');
 
+      return [flow(), reanimated()];
+    },
+  }),
+};
 ```
+
+**Note:** This looks a bit complicated. The reason is that tgv is written and published as esm, while react-native cli is not yet. You *have to* use `await import` for the plugins to load
 
 # Usage
 

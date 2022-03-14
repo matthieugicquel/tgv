@@ -17,7 +17,7 @@ import logger from './utils/logger.js';
 import { time } from './utils/utils.js';
 
 export async function tgv_start(config_def: TGVConfigDef) {
-  const { serverPort } = compute_config(config_def, {});
+  const { serverPort } = await compute_config(config_def, {});
 
   if (!fs.existsSync('.tgv-cache')) fs.mkdirSync('.tgv-cache');
 
@@ -27,7 +27,7 @@ export async function tgv_start(config_def: TGVConfigDef) {
     try {
       const query_platform = req.query.platform;
       if (typeof query_platform !== 'string') throw 'Invalid query';
-      const config = compute_config(config_def, { platform: query_platform });
+      const config = await compute_config(config_def, { platform: query_platform });
 
       res.writeHead(200, { 'Content-Type': 'application/javascript' });
 

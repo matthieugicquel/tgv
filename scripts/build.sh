@@ -24,4 +24,6 @@ sucrase ./src -d ./dist --transforms typescript --quiet
 
 # TODO: transpile and copy workers
 
+mv dist/commands.js dist/commands.cjs
+
 echo '{"type": "module"}' > ./dist/package.json

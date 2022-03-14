@@ -23,9 +23,18 @@ export type TGVConfig = {
   plugins: TGVPlugin[];
 };
 
-export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): TGVConfig {
+export async function compute_config(
+  config: TGVConfigDef,
+  cli_args: BundleCLIArgs
+): Promise<TGVConfig> {
   const platform = cli_args.platform || 'ios';
   assert_supported_platform(platform);
+
+  const user_plugins = await (async () => {
+    if (!config.plugins) return [];
+    if (Array.isArray(config.plugins)) return config.plugins;
+    return await config.plugins();
+  })();
 
   return {
     platform,
@@ -33,13 +42,7 @@ export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): T
     bundleOutput: cli_args.bundleOutput || '.tgv-cache/index.js',
     assetsDest: cli_args.assetsDest,
     serverPort: config.serverPort || 8081,
-    plugins: [
-      flow({ packages: tempFlow }),
-      svg(),
-      reanimated({ packages: tempReanimated }),
-      ...(config.plugins || []),
-      swc(),
-    ],
+    plugins: [...user_plugins, swc()],
   };
 }
 
