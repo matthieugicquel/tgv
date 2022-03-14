@@ -1,10 +1,8 @@
-import type * as babel from '@babel/core';
 import type { ParserPlugin } from '@babel/parser';
-import without from 'lodash-es/without.js';
 import { createRequire } from 'module';
 
 import { lazy, select } from '../../utils/utils.js';
-import type { TransformData, TransformError } from './types';
+import type { TGVPluginTransformError, TransformFunction } from '../types';
 
 const require = createRequire(import.meta.url);
 
@@ -21,32 +19,9 @@ const reanimated_plugins = lazy(() => {
   ];
 });
 
-const react_refresh_plugins = lazy(() => {
-  return [babel_core().createConfigItem('react-refresh/babel', { type: 'plugin' })];
-});
+export const transform: TransformFunction = input => {
+  const plugins = reanimated_plugins();
 
-export function babel_transformer(input: TransformData) {
-  const plugins: babel.ConfigItem[] = [];
-
-  if (input.required_transforms.includes('reanimated2')) {
-    try {
-      plugins.push(...reanimated_plugins());
-    } catch (error) {
-      console.warn('The reanimated babel plugin seems to be necessary and missing', error);
-    }
-  }
-
-  if (input.required_transforms.includes('react-refresh')) {
-    try {
-      plugins.push(...react_refresh_plugins());
-    } catch (error) {
-      console.warn('The react-refresh plugin seems to be missing', error);
-    }
-  }
-
-  if (!plugins.length) return input;
-
-  // JSX and TS could be handled by esbuild, but sucrase doesn't allow just applying the imports or flow transforms alone
   const parser_plugins: ParserPlugin[] = select(input.loader, {
     ts: ['typescript'],
     tsx: ['typescript', 'jsx'],
@@ -56,13 +31,13 @@ export function babel_transformer(input: TransformData) {
 
   try {
     const result = babel_core().transformSync(input.code, {
-      plugins: [...plugins],
+      plugins,
       parserOpts: {
         plugins: parser_plugins,
       },
       // configFile: false,
       // babelrc: false,
-      filename: input.filepath,
+      filename: input.relative_path,
       sourceType: 'unambiguous',
     });
 
@@ -70,9 +45,7 @@ export function babel_transformer(input: TransformData) {
 
     return {
       ...input,
-      required_transforms: without(input.required_transforms, 'react-refresh', 'reanimated2'),
       code: result.code,
-      // TODO: sourcemaps
     };
   } catch (error) {
     if (!is_babel_error(error)) throw error;
@@ -80,11 +53,11 @@ export function babel_transformer(input: TransformData) {
     const parsed_message = error.message.match(/:\s(.*)\s\(\d+:\d+\)$/)?.[1];
     const lineText = input.code.split('\n')[error.loc.line - 1];
 
-    const formatted_error: TransformError = {
+    const formatted_error: TGVPluginTransformError = {
       pluginName: 'babel',
       text: parsed_message || error.message,
       location: {
-        file: input.filepath,
+        file: input.relative_path,
         line: error.loc.line,
         column: error.loc.column,
         length: lineText.length - error.loc.line,
@@ -93,7 +66,7 @@ export function babel_transformer(input: TransformData) {
     };
     throw formatted_error;
   }
-}
+};
 
 interface BabelError extends Error {
   message: string;

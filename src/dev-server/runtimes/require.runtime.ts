@@ -9,6 +9,10 @@ import type { GlobalThis, ModuleFn } from './types';
 
 declare var globalThis: GlobalThis;
 
+const debug = (identifier: string, ...args: unknown[]) => {
+  console.log(identifier, ...args);
+};
+
 /*
  * Module registry
  */
@@ -163,15 +167,14 @@ globalThis.$PERFORM_REFRESH = (modules_to_replace: string[]) => {
     modules_to_rerun.add(identifier);
 
     const _exports = ModuleResultCache.get(identifier)?.exports;
-
     if (is_refresh_boundary(_exports)) {
       boundaries.add(identifier);
-      console.log(`${identifier} is a refresh boundary`);
+      debug(identifier, 'is a refresh boundary');
       return true;
     }
 
     const importers = ModuleGraph.get_importers(identifier);
-    console.log(`${identifier} is not a refresh boundary, importers:`, [...(importers || [])]);
+    debug(identifier, 'is not a refresh boundary, importers:', [...(importers || [])]);
 
     if (!importers?.size) return false; // We've reached the entry-point (or there's a bug)
 
@@ -186,14 +189,14 @@ globalThis.$PERFORM_REFRESH = (modules_to_replace: string[]) => {
     return;
   }
 
-  console.log('refresh', [...modules_to_rerun], [...boundaries]);
-
   for (const module_id of modules_to_rerun) {
     if (modules_to_replace.includes(module_id)) continue; // We just ran this module
+    debug(module_id, 'removing from cache');
     ModuleResultCache.delete(module_id);
   }
 
   for (const boundary of boundaries) {
+    debug(boundary, 'refreshing');
     require_inner(boundary);
   }
 

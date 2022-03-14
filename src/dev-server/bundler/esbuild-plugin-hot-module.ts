@@ -1,19 +1,26 @@
 import type * as esbuild from 'esbuild';
 
-import { TransformerOptions } from '../../shared/js-transformers/types.js';
-import { create_js_multitransformer } from '../../shared/plugin-transform-js.js';
+import { TGVPlugin } from '../../plugins/types.js';
+import { create_multitransformer } from '../../shared/esbuild-plugin-transform.js';
 import { normalize_path } from '../../utils/path.js';
+import { dedupe } from '../../utils/utils.js';
 
-export const hot_module_plugin = (
+export const esbuild_plugin_hot_module = (
   client_cached_modules: Set<string>,
-  transform_options: TransformerOptions
+  plugins: TGVPlugin[]
 ): esbuild.Plugin => {
-  const transformer = create_js_multitransformer(transform_options);
+  const transform = create_multitransformer({
+    hmr: true,
+    plugins,
+  });
 
   return {
     name: 'hot-module',
     setup(build) {
-      build.onLoad({ filter: /.*(js|jsx|ts|tsx)$/ }, ({ path }) => {
+      const extensions = dedupe(plugins.flatMap(plugin => plugin.filter.loaders ?? []));
+      const filter = new RegExp(`\\.(${extensions.join('|')})$`);
+
+      build.onLoad({ filter }, ({ path }) => {
         const relative_path = normalize_path(path);
         if (client_cached_modules.has(relative_path)) {
           // This is a dependency that's already present in the client -> don't include it
@@ -23,7 +30,7 @@ export const hot_module_plugin = (
         }
 
         // This a dependency that's not present in the client, or has been invalidated -> include it in what we send
-        return transformer({ path: relative_path });
+        return transform({ path: relative_path });
       });
     },
   };

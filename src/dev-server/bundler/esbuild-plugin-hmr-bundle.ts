@@ -1,9 +1,10 @@
 import type * as esbuild from 'esbuild';
-import { readFile } from 'fs/promises';
 import * as path from 'path';
 
-import { swc_transformer } from '../../shared/js-transformers/swc.js';
+import { TGVPlugin } from '../../plugins/types.js';
+import { create_multitransformer } from '../../shared/esbuild-plugin-transform.js';
 import { module_dirname } from '../../utils/path.js';
+import { dedupe } from '../../utils/utils.js';
 
 /**
  * Replace the refresh setup included in react-native with ours
@@ -11,23 +12,28 @@ import { module_dirname } from '../../utils/path.js';
  * - The original setup is not included, it avoids conflicts
  * - All the necessary polyfills are already setup by react-native at this point in the code
  */
-export const inject_runtime_plugin = (): esbuild.Plugin => {
+export const esbuild_plugin_hmr_bundle = (plugins: TGVPlugin[]): esbuild.Plugin => {
   return {
-    name: 'inject-runtime',
+    name: 'hmr-bundle',
     setup(build) {
+      const transform = create_multitransformer({
+        hmr: true,
+        plugins,
+      });
+
       // TODO: better RegExp
       build.onLoad({ filter: new RegExp('setUpReactRefresh') }, async () => {
         // We don't use an onResolve callback because we want this file to be in the context of the files it replaces when it comes to resolving
         const filepath = path.join(module_dirname(import.meta), '../runtimes/ws-client.runtime.js');
-        const original = await readFile(filepath, 'utf8');
-        const transformed = await swc_transformer({
-          code: original,
-          filepath,
-          loader: 'ts',
-          required_transforms: ['es5-for-hermes', 'imports'],
+        return transform({
+          path: filepath,
         });
-        return { contents: transformed.code, loader: 'ts' };
       });
+
+      const extensions = dedupe(plugins.flatMap(plugin => plugin.filter.loaders ?? []));
+      const filter = new RegExp(`\\.(${extensions.join('|')})$`);
+
+      build.onLoad({ filter }, transform);
 
       // TODO: inject something that allows logging, like expected by node_modules/react-native/Libraries/Core/setUpDeveloperTools.js
       // build.onResolve({ filter: new RegExp('(Utilities/HMRClient$') }, () => {

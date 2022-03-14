@@ -1,11 +1,10 @@
 import * as esbuild from 'esbuild';
 
-import { TGVConfig } from '../config.js';
+import { TGVPlugin } from '../plugins/types.js';
 import { compute_esbuild_options } from '../shared/esbuild-options.js';
+import { esbuild_plugin_transform } from '../shared/esbuild-plugin-transform.js';
 import { assets_plugin } from '../shared/plugin-assets.js';
 import { entry_point_plugin } from '../shared/plugin-entrypoint.js';
-import { transform_js_plugin } from '../shared/plugin-transform-js.js';
-import { svg_plugin } from '../shared/plugin-transform-svg.js';
 import { SupportedPlatform } from '../utils/platform.js';
 
 type Params = {
@@ -13,11 +12,11 @@ type Params = {
   platform: SupportedPlatform;
   outfile?: string;
   assets_dest?: string;
-  transformPackages: TGVConfig['transformPackages'];
+  plugins: TGVPlugin[];
 };
 
 export async function bundle_for_production(params: Params): Promise<void> {
-  const { entryPoint, platform, outfile, assets_dest, transformPackages } = params;
+  const { entryPoint, platform, outfile, assets_dest, plugins } = params;
 
   try {
     await esbuild.build({
@@ -34,8 +33,11 @@ export async function bundle_for_production(params: Params): Promise<void> {
       plugins: [
         entry_point_plugin(entryPoint),
         assets_plugin({ assets_dest, platform }),
-        svg_plugin({ hmr: false, transformPackages }),
-        transform_js_plugin({ hmr: false, transformPackages }),
+        esbuild_plugin_transform({
+          hmr: false,
+          plugins,
+          debugFiles: [],
+        }),
       ],
     });
   } catch (error) {

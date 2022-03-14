@@ -6,20 +6,19 @@ import { PassThrough, Transform, Writable } from 'stream';
 
 import { TGVConfig } from '../../config.js';
 import { compute_esbuild_options } from '../../shared/esbuild-options.js';
-import { TransformerOptions } from '../../shared/js-transformers/types.js';
+import { esbuild_plugin_transform } from '../../shared/esbuild-plugin-transform.js';
 import { assets_plugin } from '../../shared/plugin-assets.js';
 import { entry_point_plugin } from '../../shared/plugin-entrypoint.js';
-import { transform_js_plugin } from '../../shared/plugin-transform-js.js';
-import { svg_plugin } from '../../shared/plugin-transform-svg.js';
+import logger from '../../utils/logger.js';
 import { module_dirname } from '../../utils/path.js';
-import { hot_module_plugin } from './plugin-hot-module.js';
-import { inject_runtime_plugin } from './plugin-inject-runtime.js';
+import { esbuild_plugin_hmr_bundle } from './esbuild-plugin-hmr-bundle.js';
+import { esbuild_plugin_hot_module } from './esbuild-plugin-hot-module.js';
 
-export type DevBundlerParams = Pick<TGVConfig, 'entryFile' | 'platform' | 'transformPackages'>;
+export type DevBundlerParams = Pick<TGVConfig, 'entryFile' | 'platform' | 'plugins'>;
 
 export type DevBundler = ReturnType<typeof create_dev_bundler>;
 
-export function create_dev_bundler({ entryFile, platform, transformPackages }: DevBundlerParams) {
+export function create_dev_bundler({ entryFile, platform, plugins }: DevBundlerParams) {
   const base_build_options = {
     ...compute_esbuild_options({
       platform,
@@ -31,17 +30,11 @@ export function create_dev_bundler({ entryFile, platform, transformPackages }: D
     treeShaking: false, // It could mess with HMR
   };
 
-  const transform_options: TransformerOptions = {
-    hmr: true,
-    transformPackages,
-    debugFiles: [],
-  };
-
   const banner_promise = esbuild.build({
     ...base_build_options,
     entryPoints: [path.join(module_dirname(import.meta), '../runtimes/require.runtime.js')],
     nodePaths: [path.join(process.cwd(), 'node_modules')], // To resolve react-refresh to the locally installed package
-    plugins: [transform_js_plugin({ ...transform_options, hmr: false })],
+    plugins: [esbuild_plugin_transform({ plugins, hmr: false })],
   });
 
   const full_options = {
@@ -53,9 +46,7 @@ export function create_dev_bundler({ entryFile, platform, transformPackages }: D
     plugins: [
       entry_point_plugin(entryFile),
       assets_plugin({ platform }),
-      svg_plugin(transform_options),
-      inject_runtime_plugin(),
-      transform_js_plugin(transform_options),
+      esbuild_plugin_hmr_bundle(plugins),
     ],
   };
 
@@ -66,7 +57,7 @@ export function create_dev_bundler({ entryFile, platform, transformPackages }: D
 
     const hmr_plugins: esbuild.Plugin[] = [
       assets_plugin({ platform }),
-      hot_module_plugin(ClientKnownModules, transform_options),
+      esbuild_plugin_hot_module(ClientKnownModules, plugins),
     ];
 
     return {
@@ -123,7 +114,7 @@ export function create_dev_bundler({ entryFile, platform, transformPackages }: D
         if (!modules_to_hot_replace.length) return undefined;
 
         const entry_point_contents = modules_to_hot_replace
-          .map(filepath => `import './${filepath}';`)
+          .map(filepath => `require('./${filepath}');`)
           .join('\n');
 
         try {
@@ -182,6 +173,14 @@ function create_cjs_override_transform() {
       is_done = true;
       callback(null, override_cjs_helper(string_content));
     },
+    final(callback) {
+      if (!is_done) {
+        logger.error(
+          'Failed to replace esbuild helper in bundle. HMR will not work. Are you using the exact right esbuild version?'
+        );
+      }
+      callback();
+    },
   });
 }
 
@@ -192,7 +191,7 @@ function override_cjs_helper(bundle_with_runtime: string) {
   );
 }
 
-const esbuild_helper_regExp = /var __commonJS.*\n.*\n\s*};/;
+const esbuild_helper_regExp = /var __commonJS.*\n.*\n.*\s*};\n\s*};/;
 
 function compute_dep_graph_string(metafile?: esbuild.Metafile, filter?: string[]): string {
   if (!metafile?.inputs) return '';

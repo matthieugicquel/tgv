@@ -1,8 +1,10 @@
 import { TGVConfigDef } from '../config.js';
-import { tgv_plugin_flow } from './plugins/flow/flow.js';
-import { tgv_plugin_reanimated } from './plugins/reanimated/reanimated.js';
+import { flow } from './plugins/flow/flow.js';
+import { reanimated } from './plugins/reanimated/reanimated.js';
+import { svg } from './plugins/svg/svg.js';
+import { swc } from './plugins/swc/swc.js';
+import { TGVPlugin } from './plugins/types.js';
 import { assert_supported_platform, SupportedPlatform } from './utils/platform.js';
-import { dedupe } from './utils/utils.js';
 
 // keep in sync with commands.js
 export type BundleCLIArgs = {
@@ -18,10 +20,7 @@ export type TGVConfig = {
   bundleOutput: string;
   assetsDest: string | undefined;
   serverPort: number;
-  transformPackages: {
-    flow: string[];
-    reanimated: string[];
-  };
+  plugins: TGVPlugin[];
 };
 
 export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): TGVConfig {
@@ -34,31 +33,39 @@ export function compute_config(config: TGVConfigDef, cli_args: BundleCLIArgs): T
     bundleOutput: cli_args.bundleOutput || '.tgv-cache/index.js',
     assetsDest: cli_args.assetsDest,
     serverPort: config.serverPort || 8081,
-    transformPackages: {
-      flow: dedupe([...(config.transformPackages?.flow ?? []), ...transform_flow_default]),
-      reanimated: dedupe([
-        ...(config.transformPackages?.reanimated ?? []),
-        ...transform_reanimated_default,
-      ]),
-    },
+    plugins: [
+      flow({ packages: tempFlow }),
+      svg(),
+      reanimated({ packages: tempReanimated }),
+      ...(config.plugins || []),
+      swc(),
+    ],
   };
 }
 
-const transform_flow_default = [
-  'react-native',
-  '@react-native',
-  'react-native-screens',
-  'react-native-gesture-handler',
-  '@react-native-async-storage/async-storage',
-  '@react-native-community/art',
-  '@react-native-community/progress-bar-android',
+const tempFlow = [
+  'react-native-fs',
+  'react-native-fbsdk-next',
+  '@react-native-community/push-notification-ios',
+  '@react-native-community/picker',
+  '@react-native-community/cameraroll',
+  '@react-native-community/blur',
+  '@react-native-community/async-storage',
+  '@react-native-community/datetimepicker',
+  '@react-native-firebase/database',
+  'react-native-keyboard-aware-scroll-view',
+  'react-native-linear-gradient',
+  'react-native-animate-number',
+  'react-native-camera',
+  'react-native-popover-tooltip',
+  'react-native-video',
+  'react-native-modal-datetime-picker',
+  'react-native-share',
 ];
 
-const transform_reanimated_default = ['react-native-reanimated'];
-
-export const default_config: TGVConfigDef = {
-  plugins: [
-    tgv_plugin_flow({ packages: transform_flow_default }),
-    tgv_plugin_reanimated({ packages: transform_reanimated_default }),
-  ],
-};
+const tempReanimated = [
+  'react-native-redash',
+  'stream-chat-react-native-core',
+  'react-native-skeleton-content-nonexpo',
+  '@gorhom/bottom-sheet',
+];
