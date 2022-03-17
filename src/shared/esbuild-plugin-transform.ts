@@ -2,18 +2,19 @@ import type * as esbuild from 'esbuild';
 import { readFile, writeFile } from 'fs/promises';
 
 import { PluginData, TGVPlugin } from '../plugins/types.js';
+import { create_cached_fn } from '../utils/cached-fn.js';
+import logger from '../utils/logger.js';
 import { normalize_path } from '../utils/path.js';
 import { dedupe } from '../utils/utils.js';
 import { run_in_pool } from '../utils/worker-pool/pool.js';
 
 export function esbuild_plugin_transform(options: MultiTransformerOptions): esbuild.Plugin {
-  const extensions = dedupe(options.plugins.flatMap(plugin => plugin.filter.loaders ?? []));
-  const filter = new RegExp(`\\.(${extensions.join('|')})$`);
+  const { filter, transform } = create_multitransformer(options);
 
   return {
     name: 'tgv:transform',
     setup(build) {
-      build.onLoad({ filter }, create_multitransformer(options));
+      build.onLoad({ filter }, transform);
     },
   };
 }
@@ -24,63 +25,78 @@ export type MultiTransformerOptions = {
   debugFiles?: string[];
 };
 
-export type MultiTransformer = (params: {
-  path: string;
-}) => Promise<esbuild.OnLoadResult | undefined>;
+type MultiTransformer = {
+  filter: RegExp;
+  transform: (params: { path: string }) => Promise<esbuild.OnLoadResult | undefined>;
+};
 
 /**
  * Applies transform plugins & the final swc transpilation to ES5
  */
 export function create_multitransformer(options: MultiTransformerOptions): MultiTransformer {
-  return async function multitransform_filepath({ path }) {
+  const extensions = dedupe(options.plugins.flatMap(plugin => plugin.filter.loaders ?? []));
+  const filter = new RegExp(`\\.(${extensions.join('|')})$`);
+
+  async function transform({ path }: { path: string }) {
     const relative_path = normalize_path(path);
     const code_buffer = await readFile(relative_path);
 
     try {
-      return await multitransform({ relative_path, code_buffer, ...options });
+      return await multitransform_cached(
+        { relative_path, hmr: options.hmr },
+        code_buffer,
+        options.plugins
+      );
     } catch (error) {
       // This is probably an internal, uncontrolled error
       if (!is_transform_error(error)) throw error;
       return { errors: [error as esbuild.PartialMessage] };
     }
-  };
+  }
+  return { filter, transform };
 }
 
-async function multitransform(
-  input: MultiTransformerOptions & { relative_path: string; code_buffer: Buffer }
-): Promise<esbuild.OnLoadResult | undefined> {
-  const { relative_path, code_buffer, plugins } = input;
+const multitransform_cached = create_cached_fn<
+  { relative_path: string; hmr: boolean },
+  Buffer,
+  TGVPlugin[],
+  Promise<esbuild.OnLoadResult | undefined>
+>({
+  cache_name: 'transform-cache',
+  fn: async function multitransform({ relative_path, hmr }, code_buffer, plugins) {
+    const debug =
+      relative_path ===
+      'node_modules/react-native-reanimated/src/reanimated2/layoutReanimation/animationBuilder/index.ts';
 
-  const debug = input.relative_path.includes('constant.ts');
-
-  if (debug) {
-    console.log(`DEBUG: writing all transform steps to .tgv-cache for ${relative_path}`);
-  }
-
-  const file_extension = relative_path.split('.').pop() ?? 'js';
-  let data: PluginData = {
-    hmr: input.hmr,
-    relative_path,
-    loader: file_extension === 'js' ? 'jsx' : file_extension,
-    code: code_buffer.toString(),
-  };
-
-  for (const plugin of plugins) {
-    if (!should_apply_plugin(plugin.filter, data)) continue;
-
-    if (typeof plugin.transform === 'string') {
-      data = await run_in_pool(plugin.transform, data);
-    } else {
-      data = await plugin.transform(data);
+    if (debug) {
+      logger.debug(`Writing all transform steps to .tgv-cache for ${relative_path}`);
     }
-    if (debug) writeFile(`.tgv-cache/${plugin.name}.js`, data.code);
-  }
 
-  return {
-    contents: data.code,
-    loader: 'js',
-  };
-}
+    const file_extension = relative_path.split('.').pop() ?? 'js';
+    let data: PluginData = {
+      hmr: hmr,
+      relative_path,
+      loader: file_extension === 'js' ? 'jsx' : file_extension,
+      code: code_buffer.toString(),
+    };
+
+    for (const plugin of plugins) {
+      if (!should_apply_plugin(plugin.filter, data)) continue;
+
+      if (typeof plugin.transform === 'string') {
+        data = await run_in_pool(plugin.transform, data);
+      } else {
+        data = await plugin.transform(data);
+      }
+      if (debug) writeFile(`.tgv-cache/${plugin.name}.js`, data.code);
+    }
+
+    return {
+      contents: data.code,
+      loader: 'js',
+    };
+  },
+});
 
 function should_apply_plugin(filter: TGVPlugin['filter'], data: PluginData) {
   if (filter.loaders && !filter.loaders.includes(data.loader)) {

@@ -4,7 +4,6 @@ import * as path from 'path';
 import { TGVPlugin } from '../../plugins/types.js';
 import { create_multitransformer } from '../../shared/esbuild-plugin-transform.js';
 import { module_dirname } from '../../utils/path.js';
-import { dedupe } from '../../utils/utils.js';
 
 /**
  * Replace the refresh setup included in react-native with ours
@@ -16,7 +15,7 @@ export const esbuild_plugin_hmr_bundle = (plugins: TGVPlugin[]): esbuild.Plugin 
   return {
     name: 'hmr-bundle',
     setup(build) {
-      const transform = create_multitransformer({
+      const { filter, transform } = create_multitransformer({
         hmr: true,
         plugins,
       });
@@ -29,9 +28,6 @@ export const esbuild_plugin_hmr_bundle = (plugins: TGVPlugin[]): esbuild.Plugin 
           path: filepath,
         });
       });
-
-      const extensions = dedupe(plugins.flatMap(plugin => plugin.filter.loaders ?? []));
-      const filter = new RegExp(`\\.(${extensions.join('|')})$`);
 
       build.onLoad({ filter }, transform);
 

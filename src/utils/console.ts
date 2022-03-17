@@ -1,10 +1,12 @@
 import type * as esbuild from 'esbuild';
 import kleur from 'kleur';
-import ora from 'ora';
+import ora, { Ora } from 'ora';
 import path from 'path';
 import { performance } from 'perf_hooks';
 
 import logger from './logger.js';
+
+let global_spinner: Ora | undefined;
 
 /**
  * Show a spinner while waiting for a promise to resolve
@@ -16,6 +18,7 @@ import logger from './logger.js';
 export async function spin<T>(message: string, promise: Promise<T>): Promise<T> {
   const start = performance.now();
   const spinner = ora(message).start();
+  global_spinner = spinner;
 
   try {
     const result: T = await promise;
@@ -29,7 +32,15 @@ export async function spin<T>(message: string, promise: Promise<T>): Promise<T> 
   } catch (error) {
     spinner.stopAndPersist({ symbol: kleur.red().bold('error') });
     throw error;
+  } finally {
+    global_spinner = undefined;
   }
+}
+
+export function pause_spinner(cb: () => void) {
+  global_spinner?.clear();
+  cb();
+  global_spinner?.render();
 }
 
 export function print_errors(error: unknown) {

@@ -57,7 +57,7 @@ export const assets_plugin = ({ platform, assets_dest }: AssetPluginOptions): es
         const dir = path.dirname(relative_path);
 
         const files_list = await readdir(dir);
-        const files = await parse_dir_cached({ dir, files: files_list });
+        const files = await parse_dir_cached(dir, files_list, undefined);
 
         const size = image_extensions.includes(files[relative_path].type)
           ? image_size(await readFile(relative_path))
@@ -111,8 +111,7 @@ module.exports = registerAsset(${JSON.stringify(asset, null, 2)});
 
 const parse_dir_cached = create_cached_fn({
   cache_name: 'assets-dirs-cache',
-  id_keys: ['dir'],
-  fn: function parse_dir({ dir, files }: { dir: string; files: string[] }) {
+  fn: function parse_dir(dir: string, files: string[]) {
     const files_info = files.map(filename => {
       const on_disk_path = path.join(dir, filename);
       const parsed_path = path.parse(on_disk_path);

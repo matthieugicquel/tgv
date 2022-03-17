@@ -1,7 +1,4 @@
 import { TGVConfigDef } from '../config.js';
-import { flow } from './plugins/flow/flow.js';
-import { reanimated } from './plugins/reanimated/reanimated.js';
-import { svg } from './plugins/svg/svg.js';
 import { swc } from './plugins/swc/swc.js';
 import { TGVPlugin } from './plugins/types.js';
 import { assert_supported_platform, SupportedPlatform } from './utils/platform.js';

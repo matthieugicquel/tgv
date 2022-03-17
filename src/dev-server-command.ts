@@ -61,9 +61,11 @@ export async function tgv_start(config_def: TGVConfigDef) {
 
           hmr.send_update(result.modules_to_hot_replace, result.code);
 
-          logger.debug(
-            `♻️  Hot reloaded ${result.modules_to_hot_replace.length} files in ${duration}ms`
-          );
+          const file_message =
+            result.modules_to_hot_replace.length > 1
+              ? `${result.modules_to_hot_replace.length} files`
+              : result.modules_to_hot_replace[0];
+          logger.debug(`♻️  Hot reloaded ${file_message} in ${duration}ms`);
           if (logger.isVerbose()) await writeFile('.tgv-cache/latest-hmr.js', result.code);
         } catch (error) {
           has_error = true;

@@ -5,7 +5,7 @@
 
 var envHasBigInt64Array = typeof BigInt64Array !== 'undefined';
 
-export default function equal(a, b) {
+export default function isEqualDeep(a, b) {
   if (a === b) return true;
 
   if (a && b && typeof a == 'object' && typeof b == 'object') {
@@ -15,7 +15,7 @@ export default function equal(a, b) {
     if (Array.isArray(a)) {
       length = a.length;
       if (length != b.length) return false;
-      for (i = length; i-- !== 0; ) if (!equal(a[i], b[i])) return false;
+      for (i = length; i-- !== 0; ) if (!isEqualDeep(a[i], b[i])) return false;
       return true;
     }
 
@@ -27,7 +27,7 @@ export default function equal(a, b) {
     if (a instanceof Map && b instanceof Map) {
       if (a.size !== b.size) return false;
       for (i of a.entries()) if (!b.has(i[0])) return false;
-      for (i of a.entries()) if (!equal(i[1], b.get(i[0]))) return false;
+      for (i of a.entries()) if (!isEqualDeep(i[1], b.get(i[0]))) return false;
       return true;
     }
 
@@ -58,7 +58,7 @@ export default function equal(a, b) {
     for (i = length; i-- !== 0; ) {
       var key = keys[i];
 
-      if (!equal(a[key], b[key])) return false;
+      if (!isEqualDeep(a[key], b[key])) return false;
     }
 
     return true;

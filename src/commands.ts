@@ -6,7 +6,7 @@ function create_commands(config: TGVConfigDef) {
       name: 'tgv-start',
       description: 'starts the TGV dev server',
       func: async () => {
-        const { tgv_start } = await import('../dist/dev-server-command.js');
+        const { tgv_start } = await import('./dev-server-command.js');
         await tgv_start(config);
       },
       // TODO: options
@@ -15,7 +15,7 @@ function create_commands(config: TGVConfigDef) {
       name: 'tgv-bundle',
       description: 'Bundle with TGV',
       func: async (_: unknown, __: unknown, args: any) => {
-        const { tgv_bundle } = await import('../dist/prod-bundler-command.js');
+        const { tgv_bundle } = await import('./prod-bundler-command.js');
         await tgv_bundle(args, config);
       },
       options: bundle_args,

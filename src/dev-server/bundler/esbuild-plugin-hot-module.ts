@@ -3,13 +3,12 @@ import type * as esbuild from 'esbuild';
 import { TGVPlugin } from '../../plugins/types.js';
 import { create_multitransformer } from '../../shared/esbuild-plugin-transform.js';
 import { normalize_path } from '../../utils/path.js';
-import { dedupe } from '../../utils/utils.js';
 
 export const esbuild_plugin_hot_module = (
   client_cached_modules: Set<string>,
   plugins: TGVPlugin[]
 ): esbuild.Plugin => {
-  const transform = create_multitransformer({
+  const { filter, transform } = create_multitransformer({
     hmr: true,
     plugins,
   });
@@ -17,9 +16,6 @@ export const esbuild_plugin_hot_module = (
   return {
     name: 'hot-module',
     setup(build) {
-      const extensions = dedupe(plugins.flatMap(plugin => plugin.filter.loaders ?? []));
-      const filter = new RegExp(`\\.(${extensions.join('|')})$`);
-
       build.onLoad({ filter }, ({ path }) => {
         const relative_path = normalize_path(path);
         if (client_cached_modules.has(relative_path)) {
