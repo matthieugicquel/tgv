@@ -26,11 +26,17 @@ export function create_http_server(port: number) {
   base_server.on('upgrade', (request, socket, head) => {
     for (const [path, wss] of wss_handlers) {
       if (path === request.url) {
+        logger.debug(`Upgrading WS ${request.url}`);
         wss.handleUpgrade(request, socket as Socket, head, ws => {
           wss.emit('connection', ws);
         });
         return;
       }
+    }
+
+    if (request.url && !already_logged_missing_handlers.has(request.url)) {
+      logger.debug(`🤷‍♂️ No WS server for ${request.url}`);
+      already_logged_missing_handlers.add(request.url);
     }
 
     socket.destroy();
@@ -59,19 +65,22 @@ export function create_http_server(port: number) {
   const {
     middleware: rn_dev_server_middleware,
     websocketEndpoints,
-    debuggerProxyEndpoint,
-    messageSocketEndpoint,
-    eventsSocketEndpoint,
+    // debuggerProxyEndpoint,
+    // messageSocketEndpoint,
+    // eventsSocketEndpoint,
   } = createDevServerMiddleware({
     port,
     watchFolders: [],
   });
+
+  for (const [endpoint, wss] of Object.entries(websocketEndpoints)) {
+    attach_wss(endpoint, wss);
+  }
+
   rn_dev_server_middleware.use(indexPageMiddleware);
   server.use(rn_dev_server_middleware);
 
   // TODO
-  // attachToServer(base_server);
-
   // server.use('/symbolicate', bodyParser.text());
   // server.post('/symbolicate', (_req, res) => {
   //   // TODO
