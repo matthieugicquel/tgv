@@ -39,7 +39,7 @@ export async function compute_config(
     bundleOutput: cli_args.bundleOutput || '.tgv-cache/index.js',
     assetsDest: cli_args.assetsDest,
     serverPort: config.serverPort || 8081,
-    plugins: [...user_plugins, swc()],
+    plugins: [...user_plugins],
   };
 }
 

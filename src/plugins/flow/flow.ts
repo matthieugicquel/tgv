@@ -29,10 +29,8 @@ export const flow = ({ packages }: { packages: string[] } = { packages: [] }): T
 
         const lineText = input.code.split('\n')[error.loc.line - 1];
         const formatted_error: TGVPluginTransformError = {
-          pluginName: 'sucrase',
           text: error.message as string,
           location: {
-            file: input.relative_path,
             line: error.loc.line,
             column: error.loc.column,
             length: lineText.length - error.loc.line,

@@ -12,7 +12,7 @@ export function esbuild_plugin_transform(options: MultiTransformerOptions): esbu
   const { filter, transform } = create_multitransformer(options);
 
   return {
-    name: 'tgv:transform',
+    name: 'transform',
     setup(build) {
       build.onLoad({ filter }, transform);
     },
@@ -22,7 +22,6 @@ export function esbuild_plugin_transform(options: MultiTransformerOptions): esbu
 export type MultiTransformerOptions = {
   hmr: boolean;
   plugins: TGVPlugin[];
-  debugFiles?: string[];
 };
 
 type MultiTransformer = {
@@ -64,9 +63,7 @@ const multitransform_cached = create_cached_fn<
 >({
   cache_name: 'transform-cache',
   fn: async function multitransform({ relative_path, hmr }, code_buffer, plugins) {
-    const debug =
-      relative_path ===
-      'node_modules/react-native-reanimated/src/reanimated2/layoutReanimation/animationBuilder/index.ts';
+    const debug = false;
 
     if (debug) {
       logger.debug(`Writing all transform steps to .tgv-cache for ${relative_path}`);
@@ -83,12 +80,28 @@ const multitransform_cached = create_cached_fn<
     for (const plugin of plugins) {
       if (!should_apply_plugin(plugin.filter, data)) continue;
 
-      if (typeof plugin.transform === 'string') {
-        data = await run_in_pool(plugin.transform, data);
-      } else {
-        data = await plugin.transform(data);
+      if (debug) logger.debug(`Applying plugin ${plugin.name} to ${relative_path}`);
+
+      try {
+        if (typeof plugin.transform === 'string') {
+          data = await run_in_pool(plugin.transform, data);
+        } else {
+          data = await plugin.transform(data);
+        }
+        if (debug) writeFile(`.tgv-cache/${plugin.name}.js`, data.code);
+      } catch (error) {
+        if (!is_transform_error(error)) throw error;
+
+        const full_error: esbuild.PartialMessage = {
+          ...error,
+          pluginName: `tgv:${plugin.name}`,
+          location: {
+            ...error.location,
+            file: relative_path,
+          },
+        };
+        throw full_error;
       }
-      if (debug) writeFile(`.tgv-cache/${plugin.name}.js`, data.code);
     }
 
     return {

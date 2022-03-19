@@ -36,7 +36,6 @@ export async function bundle_for_production(params: Params): Promise<void> {
         esbuild_plugin_transform({
           hmr: false,
           plugins,
-          debugFiles: [],
         }),
       ],
     });

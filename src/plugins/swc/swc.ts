@@ -1,7 +1,7 @@
 import swc_core from '@swc/core';
 
 import { select } from '../../utils/utils.js';
-import { TGVPlugin } from '../types.js';
+import { TGVPlugin, TGVPluginTransformError } from '../types.js';
 
 export function swc(): TGVPlugin {
   return {
@@ -14,6 +14,7 @@ export function swc(): TGVPlugin {
         const transformed = await swc_core.transform(input.code, {
           filename: input.relative_path,
           swcrc: false,
+          configFile: false,
           sourceMaps: true,
           ...(input.hmr && {
             module: {
@@ -52,9 +53,23 @@ export function swc(): TGVPlugin {
           code: transformed.code,
         };
       } catch (error) {
-        // TODO: clean errors
-        throw error;
+        if (!is_swc_error(error)) throw error;
+
+        // TODO: cleaner errors
+        const formatted_error: TGVPluginTransformError = {
+          text: error.message as string,
+          location: {},
+        };
+        throw formatted_error;
       }
     },
   };
 }
+
+interface SwcError extends Error {
+  code: string;
+}
+
+const is_swc_error = (error: unknown): error is SwcError => {
+  return (error as SwcError).code !== undefined;
+};
