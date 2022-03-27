@@ -106,7 +106,14 @@ const multitransform_cached = create_cached_fn<
 
     return {
       contents: data.code,
-      loader: 'js',
+      /*
+       * TypeScript has already been transpiled away by swc, but there's an exception:
+       * When a type is re-exported from a module without `export type`, swc doesn't know it's a type and keeps it.
+       * Then, for esbuild in JS mode it becomes an import that's missing from the original file, while esbuild in TS mode will correctly ignore it.
+       * Example of problematic file: react-native-reanimated/src/reanimated2/animation/index.ts
+       * Also, since JSX is already transpiled away too, we don't need to worry about the JSX/TS syntax conflicts here
+       */
+      loader: 'ts',
     };
   },
 });
