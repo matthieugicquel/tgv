@@ -4,6 +4,8 @@ import {
 } from '@react-native-community/cli-server-api';
 import * as fs from 'fs';
 import http from 'http';
+// @ts-expect-error
+import MetroInspectorProxy from 'metro-inspector-proxy/src/InspectorProxy.js';
 import mime from 'mime-types';
 import type { Socket } from 'net';
 import { basename } from 'path';
@@ -24,11 +26,17 @@ export function create_http_server(port: number) {
   }
 
   base_server.on('upgrade', (request, socket, head) => {
+    if (!request.url) {
+      logger.debug(`🤷‍♂️ Upgrade call without url ${request}`);
+      socket.destroy();
+      return;
+    }
+
     for (const [path, wss] of wss_handlers) {
-      if (path === request.url) {
+      if (request.url.startsWith(path)) {
         logger.debug(`Upgrading WS ${request.url}`);
         wss.handleUpgrade(request, socket as Socket, head, ws => {
-          wss.emit('connection', ws);
+          wss.emit('connection', ws, request);
         });
         return;
       }
@@ -77,8 +85,16 @@ export function create_http_server(port: number) {
     attach_wss(endpoint, wss);
   }
 
-  rn_dev_server_middleware.use(indexPageMiddleware);
+  // Flipper uses the index page to detect metro
+  // https://github.com/facebook/flipper/blob/79023ee190d9e78a7c95bfb32912a4920fd6bfe4/desktop/flipper-server-core/src/devices/metro/metroDeviceManager.tsx
+  server.use(indexPageMiddleware);
+
   server.use(rn_dev_server_middleware);
+
+  const metro_inspector_proxy = new MetroInspectorProxy(process.cwd());
+  server.use(metro_inspector_proxy.processRequest.bind(metro_inspector_proxy));
+  attach_wss('/inspector/device', metro_inspector_proxy._createDeviceConnectionWSServer());
+  attach_wss('/inspector/debug', metro_inspector_proxy._createDebuggerConnectionWSServer());
 
   // TODO
   // server.use('/symbolicate', bodyParser.text());
