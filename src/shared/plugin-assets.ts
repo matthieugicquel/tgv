@@ -35,7 +35,7 @@ export const asset_extensions = [
   'db',
 ];
 
-const assets_regExp = new RegExp(`\\.*(${asset_extensions.join('|')})$`);
+const assets_regExp = new RegExp(`\\.(${asset_extensions.join('|')})$`);
 
 type AssetPluginOptions = {
   platform: 'ios' | 'android';
