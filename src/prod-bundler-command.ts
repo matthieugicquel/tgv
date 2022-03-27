@@ -24,6 +24,7 @@ export async function tgv_bundle(args: BundleCLIArgs, config_def: TGVConfigDef) 
     );
   } catch (error) {
     print_errors(error);
+    process.exit(1);
   }
 
   await destroy_worker_pool();
