@@ -1,6 +1,8 @@
 export interface GlobalThis {
   $COMMONJS: $COMMONJS;
   globalEvalWithSourceUrl: undefined | ((source: string, url: string) => void);
+  // https://github.com/facebook/react-native/blob/8bd3edec88148d0ab1f225d2119435681fbbba33/packages/polyfills/error-guard.js
+  ErrorUtils: undefined | { reportFatalError: (error: unknown) => void };
   $REACT_REFRESH: typeof import('react-refresh/runtime');
   $RefreshReg$: (type: string, id: string) => void;
   $RefreshSig$: () => (type: string) => string;

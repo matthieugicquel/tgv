@@ -32,49 +32,49 @@ globalThis.$COMMONJS = (callback_obj: { [key: string]: ModuleFn }) => {
 
   ModuleRunCache.set(identifier, module_fn);
 
-  return function __require() {
-    return require_inner(identifier);
-  };
+  return create_require_fn(identifier);
 };
 
-function require_inner(identifier: string) {
-  if (ModuleResultCache.has(identifier)) {
-    return ModuleResultCache.get(identifier)?.exports;
-  }
+// Using a curried function here to minimize the stacktrace
+function create_require_fn(identifier: string) {
+  return function __require() {
+    if (ModuleResultCache.has(identifier)) {
+      return ModuleResultCache.get(identifier)?.exports;
+    }
 
-  const module_fn = ModuleRunCache.get(identifier);
+    const module_fn = ModuleRunCache.get(identifier);
 
-  if (typeof module_fn !== 'function') {
-    throw new Error(`Module ${identifier} not found in run cache`);
-  }
+    if (typeof module_fn !== 'function') {
+      throw new Error(`Module ${identifier} not found in run cache`);
+    }
 
-  let _module = { exports: {} };
-  // This must be done before running module_fn, or everything (circular dependencies really, I think) breaks
-  ModuleResultCache.set(identifier, _module);
+    let _module = { exports: {} };
+    // This must be done before running module_fn, or everything (circular dependencies really, I think) breaks
+    ModuleResultCache.set(identifier, _module);
 
-  if (identifier.includes('node_modules/')) {
+    if (identifier.includes('node_modules/')) {
+      try {
+        module_fn(_module.exports, _module);
+        return _module.exports;
+      } catch (error) {
+        reportFatalError(identifier, error);
+      }
+    }
+
+    // This is app code, we want to register it with fast refresh
+    const { conclude_refresh_registration, reset_refresh_registration } =
+      prepare_refresh_registration(identifier);
     try {
       module_fn(_module.exports, _module);
+      conclude_refresh_registration(_module);
       return _module.exports;
     } catch (error) {
-      // TODO: make this error visible
-      console.error('module run error', identifier, error);
+      reportFatalError(identifier, error);
       throw error;
+    } finally {
+      reset_refresh_registration();
     }
-  }
-
-  // This is app code, we want to register it with fast refresh
-  const { conclude_refresh_registration, reset_refresh_registration } =
-    prepare_refresh_registration(identifier);
-  try {
-    module_fn(_module.exports, _module);
-    conclude_refresh_registration(_module);
-    return _module.exports;
-  } catch (error) {
-    throw error;
-  } finally {
-    reset_refresh_registration();
-  }
+  };
 }
 
 globalThis.$UPDATE_MODULE_GRAPH = graph => {
@@ -197,7 +197,7 @@ globalThis.$PERFORM_REFRESH = (modules_to_replace: string[]) => {
 
   for (const boundary of boundaries) {
     debug(boundary, 'refreshing');
-    require_inner(boundary);
+    create_require_fn(boundary)();
   }
 
   Refresh.performReactRefresh();
@@ -227,4 +227,10 @@ function is_getter(obj: any, key: string) {
   if (!obj || typeof obj !== 'object') return false;
   const desc = Object.getOwnPropertyDescriptor(obj, key);
   return desc && desc.get;
+}
+
+function reportFatalError(module_id: string, error: unknown) {
+  globalThis.ErrorUtils
+    ? globalThis.ErrorUtils.reportFatalError(error)
+    : console.error('Error running module', module_id, error);
 }
