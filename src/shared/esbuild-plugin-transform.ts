@@ -63,7 +63,7 @@ const multitransform_cached = create_cached_fn<
 >({
   cache_name: 'transform-cache',
   fn: async function multitransform({ relative_path, hmr }, code_buffer, plugins) {
-    const debug = false;
+    const debug = relative_path === 'App.tsx';
 
     if (debug) {
       logger.debug(`Writing all transform steps to .tgv-cache for ${relative_path}`);

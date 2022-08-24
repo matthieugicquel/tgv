@@ -70,7 +70,6 @@ function create_require_fn(identifier: string) {
       return _module.exports;
     } catch (error) {
       reportFatalError(identifier, error);
-      throw error;
     } finally {
       reset_refresh_registration();
     }

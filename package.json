@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "./scripts/build.sh && watchman-make -p 'src/**/*' 'scripts/**/*' --run './scripts/build.sh'",
-    "build": "./scripts/build.sh"
+    "build": "./scripts/build.sh",
+    "test": "jest"
   },
   "bin": {
     "tgv": "./bin/tgv-start.js",
@@ -24,6 +25,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.17.2",
+    "@parcel/source-map": "^2.0.2",
     "@parcel/watcher": "^2.0.5",
     "@react-native-community/cli-server-api": "^7.0.1",
     "@react-native-community/cli-tools": "^7.0.1",
@@ -45,7 +47,9 @@
   "devDependencies": {
     "@react-native-community/cli-types": "^7.0.1",
     "@react-native/polyfills": "^2.0.0",
+    "@swc/jest": "^0.2.20",
     "@types/babel__core": "^7.1.18",
+    "@types/jest": "^27.4.1",
     "@types/lodash-es": "^4.17.6",
     "@types/mime-types": "^2.1.1",
     "@types/node": "^17.0.18",
@@ -59,6 +63,7 @@
     "eslint": "^8.9.0",
     "eslint-plugin-import": "^2.25.4",
     "eslint-plugin-simple-import-sort": "^7.0.0",
+    "jest": "^27.5.1",
     "prettier": "^2.4.1",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",

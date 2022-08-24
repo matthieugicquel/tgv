@@ -42,9 +42,23 @@ export async function tgv_start(config_def: TGVConfigDef) {
         },
       });
 
-      const { build_full_bundle, build_hmr_payload } = get_bundler(config)(hmr.socket_url);
+      const { build_full_bundle, build_hmr_payload, symbolicate } = get_bundler(config)(
+        hmr.socket_url
+      );
 
       await spin(`📦 Bundling ${config.entryFile} for ${config.platform}`, build_full_bundle(res));
+
+      // server.use('/symbolicate', bodyParser.text({ defaultCharset: 'utf-8' }));
+      server.post('/symbolicate', (req, res) => {
+        if (!('rawBody' in req)) {
+          res.writeHead(400).end('Missing request body.');
+          return;
+        }
+        const input = JSON.parse(req.rawBody);
+        const output = symbolicate(input);
+        res.writeHead(200);
+        res.end(JSON.stringify(output));
+      });
 
       let has_error = false;
 

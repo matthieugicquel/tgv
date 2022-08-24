@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import keys from 'lodash-es/keys.js';
 import * as path from 'path';
 import { PassThrough, Transform, Writable } from 'stream';
+import { finished, pipeline } from 'stream/promises';
 
 import { TGVConfig } from '../../config.js';
 import { compute_esbuild_options } from '../../shared/esbuild-options.js';
@@ -11,6 +12,8 @@ import { assets_plugin } from '../../shared/plugin-assets.js';
 import { entry_point_plugin } from '../../shared/plugin-entrypoint.js';
 import logger from '../../utils/logger.js';
 import { module_dirname } from '../../utils/path.js';
+import { create_symbolicator } from '../symbolicator/symbolicator.js';
+import { SymbolicatorInput, SymbolicatorOutput } from '../symbolicator/types.js';
 import { esbuild_plugin_hmr_bundle } from './esbuild-plugin-hmr-bundle.js';
 import { esbuild_plugin_hot_module } from './esbuild-plugin-hot-module.js';
 
@@ -52,6 +55,8 @@ export function create_dev_bundler({ entryFile, platform, plugins }: DevBundlerP
 
   let rebuild: esbuild.BuildInvalidate;
 
+  const symbolicator = create_symbolicator();
+
   return function bundler_for_client(socket_url: string) {
     const ClientKnownModules = new Set<string>();
 
@@ -62,11 +67,14 @@ export function create_dev_bundler({ entryFile, platform, plugins }: DevBundlerP
 
     return {
       async build_full_bundle(res_stream: Writable) {
+        const runtime_banner = (await banner_promise).outputFiles[1].text;
+        const banner_length = runtime_banner.split(/\r\n|\r|\n/).length;
+
         const code_stream = new PassThrough();
         code_stream.pipe(res_stream);
 
         if (process.env.DEBUG) {
-          const save_stream = fs.createWriteStream('.tgv-cache/latest-bundle.js');
+          const save_stream = fs.createWriteStream('.tgv-cache/processed-bundle.js');
           code_stream.pipe(save_stream);
         }
 
@@ -78,14 +86,24 @@ export function create_dev_bundler({ entryFile, platform, plugins }: DevBundlerP
           rebuild = result.rebuild as esbuild.BuildInvalidate;
 
           code_stream.write(`globalThis.$TGV_SOCKET_URL = '${socket_url}';\n`);
-          code_stream.write((await banner_promise).outputFiles[1].contents);
-          code_stream.write(compute_dep_graph_string(result.metafile));
+          symbolicator.offset(1);
+
+          code_stream.write(runtime_banner);
+          symbolicator.offset(banner_length);
+
+          const dep_graph_string = compute_dep_graph_string(result.metafile);
+          code_stream.write(dep_graph_string);
+          code_stream.write('\n');
+          symbolicator.offset(dep_graph_string.split(/\r\n|\r|\n/).length);
+
           fs.createReadStream(`${full_options.outdir}/${entryFile}`, 'utf8')
             .pipe(create_cjs_override_transform())
             .pipe(code_stream);
 
           const included_modules = Object.keys(result.metafile?.inputs ?? {});
           for (const identifier of included_modules) ClientKnownModules.add(identifier);
+
+          symbolicator.includeBundle(`${full_options.outdir}/${entryFile}`);
         } catch (error) {
           ClientKnownModules.clear();
           code_stream.end(`throw new Error('\\n\\n🤷 Build failed, check your terminal');`);
@@ -151,6 +169,9 @@ ${override_cjs_helper(result.outputFiles[1].text)}`;
           for (const identifier of changed_files) ClientKnownModules.add(identifier); // reset
           throw (error as esbuild.BuildFailure).errors;
         }
+      },
+      symbolicate(input: SymbolicatorInput): SymbolicatorOutput {
+        return symbolicator.processStackTrace(input.stack);
       },
     };
   };

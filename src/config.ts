@@ -1,5 +1,4 @@
 import { TGVConfigDef } from '../config.js';
-import { swc } from './plugins/swc/swc.js';
 import { TGVPlugin } from './plugins/types.js';
 import { assert_supported_platform, SupportedPlatform } from './utils/platform.js';
 

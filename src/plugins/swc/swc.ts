@@ -12,10 +12,12 @@ export function swc(): TGVPlugin {
     async transform(input) {
       try {
         const transformed = await swc_core.transform(input.code, {
+          sourceRoot: process.cwd(),
+          sourceFileName: input.relative_path,
           filename: input.relative_path,
           swcrc: false,
           configFile: false,
-          sourceMaps: true,
+          sourceMaps: 'inline',
           ...(input.hmr && {
             module: {
               type: 'commonjs',

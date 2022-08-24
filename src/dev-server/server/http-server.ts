@@ -92,17 +92,12 @@ export function create_http_server(port: number) {
   server.use(rn_dev_server_middleware);
 
   const metro_inspector_proxy = new MetroInspectorProxy(process.cwd());
-  server.use(metro_inspector_proxy.processRequest.bind(metro_inspector_proxy));
+  // server.use(metro_inspector_proxy.processRequest.bind(metro_inspector_proxy));
   attach_wss('/inspector/device', metro_inspector_proxy._createDeviceConnectionWSServer());
   attach_wss('/inspector/debug', metro_inspector_proxy._createDebuggerConnectionWSServer());
 
   // TODO
-  // server.use('/symbolicate', bodyParser.text());
-  // server.post('/symbolicate', (_req, res) => {
-  //   // TODO
-  //   res.writeHead(200);
-  //   res.end();
-  // });
+  // server.use('/symbolicate', bodyParser.json());
 
   server.get('/assets/*', (req, res) => {
     const fs_path = req.path.replace('/assets/', '');
